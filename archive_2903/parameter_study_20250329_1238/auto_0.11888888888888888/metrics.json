@@ -1,0 +1,26 @@
+{
+    "0_-3_to_3_0": {
+        "pcmci": {
+            "mae": 0.14020726084709167,
+            "rmse": 0.14020900927571295,
+            "bias": 0.0007002055644989014,
+            "success_rate": 1.0
+        },
+        "bagged": {
+            "mae": 0.13760083913803095,
+            "rmse": 0.1376405634811792,
+            "bias": 0.003306627273559626,
+            "success_rate": 1.0
+        },
+        "bootstrap": {
+            "mae": 0.1346072951952617,
+            "rmse": 0.1346644571617743,
+            "bias": -0.0039232770601908,
+            "success_rate": 1.0,
+            "ci_coverage": 0.0,
+            "multimodal_rate": 0.0,
+            "multimodal_count": 0,
+            "distribution_count": 2
+        }
+    }
+}

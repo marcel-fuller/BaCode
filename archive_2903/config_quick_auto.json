@@ -1,0 +1,19 @@
+{
+    "N": 3,
+    "T": 300,
+    "n_datasets": 2,
+    "n_boot": 20,
+    "auto_coeffs": [
+        0.5,
+        0.9
+    ],
+    "cross_coeffs": [
+        0.2,
+        0.6
+    ],
+    "noise_levels": [
+        0.3,
+        1.0
+    ],
+    "parameter_to_study": "auto"
+}

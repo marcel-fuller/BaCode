@@ -1,0 +1,21 @@
+{
+    "0_-3_to_3_0": {
+        "pcmci": {},
+        "bagged": {
+            "mae": 0.15174392610788343,
+            "rmse": 0.15174392610788343,
+            "bias": 0.15174392610788343,
+            "success_rate": 1.0
+        },
+        "bootstrap": {
+            "mae": 0.1567004770040512,
+            "rmse": 0.1567004770040512,
+            "bias": 0.1567004770040512,
+            "success_rate": 1.0,
+            "ci_coverage": 0.0,
+            "multimodal_rate": 0.0,
+            "multimodal_count": 0,
+            "distribution_count": 1
+        }
+    }
+}

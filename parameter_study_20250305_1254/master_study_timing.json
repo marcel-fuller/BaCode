@@ -1,0 +1,14 @@
+{
+    "name": "overall_study",
+    "timings": {
+        "auto_study": [
+            40.78774118423462
+        ],
+        "cross_study": [
+            33.561402559280396
+        ],
+        "noise_study": [
+            10.610773086547852
+        ]
+    }
+}

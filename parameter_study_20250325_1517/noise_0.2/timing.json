@@ -1,0 +1,65 @@
+{
+    "name": "noise_0.2",
+    "timings": {
+        "setup": [
+            8.58306884765625e-06
+        ],
+        "dataset_0_generation": [
+            0.03756880760192871
+        ],
+        "dataset_1_generation": [
+            0.03316831588745117
+        ],
+        "data_generation": [
+            0.08984017372131348
+        ],
+        "dataset_0_standard_pcmci": [
+            0.11522221565246582
+        ],
+        "dataset_0_boostrap_bootstrap": [
+            0.11479377746582031
+        ],
+        "dataset_0_boostrap_create_bagged": [
+            4.76837158203125e-07
+        ],
+        "dataset_1_standard_pcmci": [
+            0.1151130199432373
+        ],
+        "dataset_1_boostrap_bootstrap": [
+            0.11489558219909668
+        ],
+        "dataset_1_boostrap_create_bagged": [
+            4.76837158203125e-07
+        ],
+        "causal_discovery": [
+            0.5773947238922119
+        ],
+        "dataset_0_pair_0_true_groundtruth": [
+            0.033190011978149414
+        ],
+        "dataset_0_pair_0_pcmci_estimate_pcmci": [
+            2.3655831813812256
+        ],
+        "dataset_0_pair_0_bagged_estimate_bagged": [
+            2.696326494216919
+        ],
+        "dataset_0_pair_0_bootstrap_estimate_all_bootstrap": [
+            4.482269287109375e-05
+        ],
+        "dataset_1_pair_0_true_groundtruth": [
+            0.025167226791381836
+        ],
+        "dataset_1_pair_0_pcmci_estimate_pcmci": [
+            3.0954647064208984
+        ],
+        "dataset_1_pair_0_bagged_estimate_bagged": [
+            4.3392181396484375e-05
+        ],
+        "effect_estimation": [
+            8.266153812408447
+        ],
+        "total_execution": [
+            8.962942838668823
+        ]
+    }
+}

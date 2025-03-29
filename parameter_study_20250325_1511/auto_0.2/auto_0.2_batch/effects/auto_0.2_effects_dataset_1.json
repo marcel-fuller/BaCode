@@ -1,0 +1,16 @@
+{
+    "0_-3_to_3_0": {
+        "true_effect": 0.4805234968662262,
+        "pcmci_effect": 0.5680385828018186,
+        "bagged_effect": 0.5680385828018186,
+        "bootstrap_stats": {
+            "mean": 0.5705325206120807,
+            "std": 0.004406144197512881,
+            "ci_lower": 0.5595870516477647,
+            "ci_upper": 0.5814779895763967,
+            "n_total": 3,
+            "n_nan": 0,
+            "estimation_success_rate": 1.0
+        }
+    }
+}

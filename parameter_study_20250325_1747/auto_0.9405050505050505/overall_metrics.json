@@ -1,0 +1,19 @@
+{
+    "pcmci": {
+        "success_count": 0,
+        "attempt_count": 1,
+        "success_rate": 0.0
+    },
+    "bagged": {
+        "success_count": 1,
+        "attempt_count": 1,
+        "success_rate": 1.0
+    },
+    "bootstrap": {
+        "success_count": 1,
+        "attempt_count": 1,
+        "multimodal_count": 0,
+        "success_rate": 1.0,
+        "multimodal_rate": 0.0
+    }
+}

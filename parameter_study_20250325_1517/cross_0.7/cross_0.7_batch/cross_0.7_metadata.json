@@ -1,0 +1,17 @@
+{
+    "timestamp": "20250325_153450",
+    "param_name": "cross",
+    "param_value": 0.7,
+    "n_datasets": 2,
+    "T": 500,
+    "var_names": [
+        "X1",
+        "X2",
+        "X3",
+        "X4"
+    ],
+    "seeds": [
+        1297740233,
+        664157049
+    ]
+}

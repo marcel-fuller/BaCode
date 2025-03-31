@@ -11,7 +11,7 @@ import json
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from scipy import stats
+from scipy import stats as scipy_stats
 
 from tigramite import data_processing as pp
 from tigramite.pcmci import PCMCI
@@ -103,15 +103,14 @@ def create_causal_model(graph_structure=None, n_vars=4, auto_coeff=0.8, cross_co
         # Create default structure with configurable strengths
         links = {
             0: [((0, -1), auto_coeff, linear_func), 
-                ((2, -3), cross_coeff * 0.7, linear_func)],
+                ((2, -1), cross_coeff, linear_func)],
             1: [((1, -1), auto_coeff, linear_func), 
                 ((0, -1), cross_coeff, linear_func)],
-            2: [((2, -1), auto_coeff, linear_func), 
-                ((1, -1), cross_coeff, linear_func)],       
+            2: [((2, -1), auto_coeff, linear_func)],       
             3: [((3, -1), auto_coeff, linear_func),
-                ((0, -3), cross_coeff, linear_func), 
-                ((1, -2), cross_coeff, linear_func), 
-                ((2, -3), cross_coeff, linear_func)]
+                ((0, -1), cross_coeff, linear_func), 
+                ((1, -1), cross_coeff, linear_func), 
+                ((2, -2), cross_coeff, linear_func)]
         }
     elif isinstance(graph_structure, np.ndarray):
         n_vars = graph_structure.shape[0]
@@ -183,7 +182,7 @@ def create_stable_model(n_vars=4, auto_coeff=0.8, cross_coeff=0.5, noise_sigma=0
     # Create links with fixed structure but configurable strengths
     links = {
         0: [((0, -1), auto_coeffs[0], linear_func), 
-            ((2, -3), cross_coeffs[0] * 0.7, linear_func)],
+            ((2, -3), cross_coeffs[0] , linear_func)],
         1: [((1, -1), auto_coeffs[1], linear_func), 
             ((0, -1), cross_coeffs[1], linear_func)],
         2: [((2, -1), auto_coeffs[2], linear_func), 
@@ -497,6 +496,67 @@ def get_groundtruth(links, X, Y, noises=None, seed=1, T_int=100):
     
     return effect, timer.elapsed
 
+# Function to get the optimal adjustment set for a given graph
+def get_optimal_adjustment_set(graph, X, Y, var_names=None):
+    try:
+        # Initialize CausalEffects object
+        causal_effects = CausalEffects(
+            graph, 
+            graph_type='stationary_admg', 
+            X=[X], Y=[Y], 
+            S=None, 
+            hidden_variables=None, 
+            verbosity=0
+        )
+        
+        # Check if there is a valid causal path
+        if not causal_effects.check_XYS_paths()[0]:
+            return None, "No valid causal path found"
+        
+        # Get optimal adjustment set
+        optimal_set = causal_effects.get_optimal_set()
+        
+        # Convert node indices to variable names if provided
+        if var_names is not None:
+            named_optimal_set = []
+            for node in optimal_set:
+                var_idx, lag = node
+                var_name = var_names[var_idx]
+                named_optimal_set.append(f"{var_name}(t{lag if lag < 0 else ''})")
+            return optimal_set, named_optimal_set
+        else:
+            return optimal_set, None
+            
+    except Exception as e:
+        return None, f"Error: {str(e)}"
+
+# Run the analysis for each graph
+def compare_adjustment_sets(discovery_results, X, Y, true_graph=None, var_names=None):
+    results = {}
+    
+    # Extract graphs
+    pcmci_graph = discovery_results['pcmci']['graph']
+    bagged_graph = discovery_results['bagged_graph']
+    
+    # Define graph dictionary
+    graphs = {
+        "PCMCI Graph": pcmci_graph,
+        "Bagged Graph": bagged_graph
+    }
+    
+    # Add true graph if provided
+    if true_graph is not None:
+        graphs["True Graph"] = true_graph
+    
+    # Get adjustment sets for each graph
+    for name, graph in graphs.items():
+        optimal_set, readable_set = get_optimal_adjustment_set(graph, X, Y, var_names)
+        results[name] = {
+            "optimal_set": optimal_set,
+            "readable_set": readable_set
+        }
+    
+    return results
 
 def estimate_causal_effect(graph, dataframe, X, Y, save_path=None):
     """
@@ -539,7 +599,7 @@ def estimate_causal_effect(graph, dataframe, X, Y, save_path=None):
                 # Fit the causal effect model
                 causal_effects.fit_total_effect(
                     dataframe=dataframe, 
-                    estimator=None,  # Use default linear regression
+                    estimator=LinearRegression(),  # Use default linear regression
                     adjustment_set='optimal',
                     conditional_estimator=None,  
                     data_transform=None,
@@ -644,7 +704,7 @@ def estimate_bootstrap_effects(bootstrap_graphs, dataframe, X, Y, save_path=None
             # Calculate confidence interval
             n_valid = len(valid_effects)
             se = std / np.sqrt(n_valid)
-            ci = stats.t.interval(0.95, df=n_valid-1, loc=mean, scale=se)
+            ci = scipy_stats.t.interval(0.95, df=n_valid-1, loc=mean, scale=se)
             
             stats = {
                 'mean': float(mean),

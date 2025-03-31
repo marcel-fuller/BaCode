@@ -640,7 +640,7 @@ def run_parameter_study(param_name, param_values, base_params=None, output_dir=N
     # Set default base parameters if not provided
     if base_params is None:
         base_params = {
-            'auto_coeff': 0.8,
+            'auto_coeff': 0.5,
             'cross_coeff': 0.5,
             'noise_sigma': 0.5,
             'n_vars': 4,

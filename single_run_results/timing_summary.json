@@ -1,0 +1,22 @@
+{
+    "total_time": 81.86106991767883,
+    "data_generation_time": 0.004134416580200195,
+    "discovery_times": {
+        "pcmci": 0.31496167182922363,
+        "bootstrap": 1.1628453731536865
+    },
+    "effect_times": {
+        "0_-2_to_3_0": {
+            "true_effect": 0.02541375160217285,
+            "pcmci_effect": 5.045913219451904,
+            "bagged_effect": 4.681544780731201,
+            "bootstrap_effects": 38.85398483276367
+        },
+        "0_-1_to_0_0": {
+            "true_effect": 0.025125741958618164,
+            "pcmci_effect": 3.3251399993896484,
+            "bagged_effect": 3.1160356998443604,
+            "bootstrap_effects": 24.495113372802734
+        }
+    }
+}

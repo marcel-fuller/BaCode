@@ -1,0 +1,7 @@
+{
+    "pc_alpha": 0.05,
+    "tau_max": 5,
+    "n_boot": 10,
+    "boot_blocklength": 10,
+    "bootstrap_time": 1.1628453731536865
+}

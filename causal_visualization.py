@@ -76,6 +76,58 @@ def plot_causal_graph(graph, val_matrix=None, var_names=None, save_path=None, ti
     
     return fig_ax
 
+def plot_ts_graph(graph, val_matrix=None, var_names=None, save_path=None, title=None, fig_ax = None):
+    """
+    Plot a causal graph.
+    
+    Parameters
+    ----------
+    graph : numpy.ndarray
+        Causal graph from PCMCI
+    val_matrix : numpy.ndarray, optional
+        Value matrix for edge colors
+    var_names : list, optional
+        Variable names
+    save_path : str, optional
+        Path to save the plot
+    title : str, optional
+        Plot title
+        
+    Returns
+    -------
+    matplotlib.figure.Figure
+        The created figure
+    """
+    # Set default variable names if not provided
+    if var_names is None:
+        var_names = [f'X{i+1}' for i in range(graph.shape[0])]
+    
+    # Let tigramite create the figure and plot the graph
+    if fig_ax is None:
+        fig_ax = plt.subplots(figsize=(10, 8))
+        
+    tp.plot_time_series_graph(
+        val_matrix=val_matrix,
+        graph=graph,
+        var_names=var_names,
+        link_colorbar_label='MCI test strength' if val_matrix is not None else None,
+        fig_ax=fig_ax,
+        figsize=None  # Don't set figsize since we already created the figure
+    )
+    
+    # Set title
+    if title:
+        plt.title(title, fontsize=14)
+    
+    plt.tight_layout()
+    
+    # Save if path is provided
+    if save_path:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    
+    return fig_ax
+
 
 def plot_graph_comparison(graphs_dict, var_names=None, save_path=None):
     """

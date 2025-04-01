@@ -554,7 +554,7 @@ def run_pipeline(auto_coeff=0.8, cross_coeff=0.5, noise_sigma=0.5, n_vars=4, T=5
             json.dump(params, f, indent=4)
     
     # Create causal model
-    links, noises = create_stable_model(n_vars, auto_coeff, cross_coeff, noise_sigma)
+    links, noises = create_causal_model(auto_coeff=auto_coeff, cross_coeff=cross_coeff, noise_sigma=noise_sigma)
     
     # Generate dataset
     dataset, data_time = generate_dataset(
@@ -779,7 +779,7 @@ def run_full_study(auto_values=None, cross_values=None, noise_values=None,
         'base_params': base_params,
         'timestamp': datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
     }
-    
+    print(type(study_params))
     with open(os.path.join(output_dir, 'full_study_parameters.json'), 'w') as f:
         json.dump(study_params, f, indent=4)
     

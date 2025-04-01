@@ -1,0 +1,42 @@
+{
+    "X": [
+        0,
+        -2
+    ],
+    "Y": [
+        3,
+        0
+    ],
+    "bootstrap_effects": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        0.7567439675331115,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+    ],
+    "stats": {
+        "mean": 0.7567439675331115,
+        "std": 0.0,
+        "ci_lower": NaN,
+        "ci_upper": NaN,
+        "n_total": 20,
+        "n_nan": 19,
+        "estimation_success_rate": 0.05
+    },
+    "estimation_time": 13.618938446044922
+}

@@ -1,0 +1,42 @@
+{
+    "X": [
+        0,
+        -2
+    ],
+    "Y": [
+        3,
+        0
+    ],
+    "bootstrap_effects": [
+        null,
+        null,
+        null,
+        0.757394552230835,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        0.7676498293876649,
+        null,
+        0.7623102068901061,
+        null,
+        null,
+        null,
+        0.7583892345428467,
+        null,
+        0.7681350111961365,
+        null
+    ],
+    "stats": {
+        "mean": 0.7627757668495179,
+        "std": 0.004492078986797449,
+        "ci_lower": 0.7571981140945239,
+        "ci_upper": 0.7683534196045119,
+        "n_total": 20,
+        "n_nan": 15,
+        "estimation_success_rate": 0.25
+    },
+    "estimation_time": 61.72783613204956
+}

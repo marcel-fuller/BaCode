@@ -1,0 +1,12 @@
+{
+    "var_names": [
+        "X1",
+        "X2",
+        "X3",
+        "X4"
+    ],
+    "T": 300,
+    "seed": 124,
+    "nonstat": false,
+    "generation_time": 0.0019059181213378906
+}

@@ -1,0 +1,6 @@
+{
+    "pc_alpha": 0.05,
+    "tau_max": 5,
+    "test_type": "ParCorr",
+    "discovery_time": 0.1457974910736084
+}

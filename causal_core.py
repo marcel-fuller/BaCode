@@ -72,6 +72,14 @@ class Timer:
 # Model Creation Functions
 # =====================================================================
 
+def create_consistent_noise(seed, sigma, size):
+    np.random.seed(seed)
+    return np.random.normal(0, sigma, size)
+
+
+
+
+
 def create_causal_model(graph_structure=None, n_vars=4, auto_coeff=0.8, cross_coeff=0.5, noise_sigma=0.5):
     """
     Create a full causal model from a graph structure or with default connectivity.
@@ -133,7 +141,12 @@ def create_causal_model(graph_structure=None, n_vars=4, auto_coeff=0.8, cross_co
         n_vars = max(links.keys()) + 1
     
     # Create noise distributions
-    noises = [lambda size: np.random.normal(0, noise_sigma, size) for _ in range(n_vars)]
+    # Usage
+    # Generate unique seeds for each noise generator
+    unique_seeds = np.random.SeedSequence(42).spawn(n_vars)
+    noises = [lambda size, seed=seed.generate_state(1)[0], sigma=noise_sigma: 
+          create_consistent_noise(seed, sigma, size) 
+          for seed in unique_seeds]
     
     return links, noises
 
@@ -226,8 +239,8 @@ def generate_dataset(links, T=500, noises=None, seed=None, save_path=None):
         (dataframe, elapsed_time) - Generated time series data and generation time
     """
     # Set random seed if provided
-    if seed is not None:
-        np.random.seed(seed)
+    if seed is None:
+        seed = np.random.randint(0,2**31-1)
     
     # Measure time
     with Timer("data_generation", save_path) as timer:
@@ -248,8 +261,18 @@ def generate_dataset(links, T=500, noises=None, seed=None, save_path=None):
         # Save data and metadata
         np.save(f"{save_path}_data.npy", data)
         
+        linkString =""
+        for var, parents in links.items():
+            linkString += f"Variable X{var+1} has parents:" +"\n"
+            for parent in parents:
+                parent_var, parent_lag = parent[0]
+                coeff = parent[1]
+                func = parent[2].__name__ if hasattr(parent[2], '__name__') else str(parent[2])
+                linkString += f"  X{parent_var+1}(t{parent_lag}) with coefficient {coeff:.4f} and function {func}" +"\n"
+        
         metadata = {
             'var_names': var_names,
+            'links': linkString,
             'T': T,
             'seed': seed,
             'nonstat': bool(nonstat),
@@ -434,7 +457,7 @@ def run_causal_discovery(dataset, pc_alpha=0.05, tau_max=5, n_boot=100,
 # Causal Effect Estimation Functions
 # =====================================================================
 
-def get_groundtruth(links, X, Y, noises=None, seed=1, T_int=100):
+def get_groundtruth(links, X, Y, noises=None, seed=None, T_int=500):
     """
     Calculate ground truth causal effect through intervention.
     
@@ -458,6 +481,10 @@ def get_groundtruth(links, X, Y, noises=None, seed=1, T_int=100):
     float
         Mean difference in outcome between interventions
     """
+    if seed is None:
+        #smaller max-seed since its multiplied in the ensemble function
+        seed = np.random.randint(0,2**16-1)
+    
     with Timer("groundtruth_calculation") as timer:
         # Set up intervention values for treatment
         intervention1 = np.ones(T_int)

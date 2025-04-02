@@ -1,0 +1,33 @@
+{
+    "X": [
+        0,
+        -2
+    ],
+    "Y": [
+        3,
+        0
+    ],
+    "effect": 0.3239718377590179,
+    "adjustment_set": [
+        [
+            2,
+            -3
+        ],
+        [
+            2,
+            -2
+        ],
+        [
+            3,
+            -2
+        ],
+        [
+            1,
+            -2
+        ]
+    ],
+    "adjustment_set_size": 4,
+    "ci_lower": null,
+    "ci_upper": null,
+    "estimation_time": 0.5056154727935791
+}

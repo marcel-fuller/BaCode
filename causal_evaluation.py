@@ -12,13 +12,15 @@ import numpy as np
 import pandas as pd
 import time
 from datetime import datetime
+from scipy.cluster import hierarchy
 
 from causal_core import (
     create_causal_model,
     create_stable_model,
     generate_dataset,
     run_causal_discovery,
-    estimate_all_effects
+    estimate_all_effects,
+    estimate_all_effects_with_confidence
 )
 
 
@@ -486,9 +488,7 @@ def calculate_metrics(results_df, group_by=None):
     # Add CI coverage for bootstrap
     if 'ci_covers_true' in results_df.columns:
         metrics['bootstrap_ci_coverage'] = pd.NamedAgg(column='ci_covers_true', aggfunc='mean')
-    
-    print (methods)
-    
+
     # Group if specified
     if group_by:
         return results_df.groupby(group_by).agg(**metrics).reset_index()
@@ -596,7 +596,7 @@ def run_pipeline(auto_coeff=0.8, cross_coeff=0.5, noise_sigma=0.5, n_vars=4, T=5
                 pc_alpha=0.05, tau_max=5, n_boot=100, effect_pairs=None, 
                 output_dir=None, seed=None):
     """
-    Run complete causal discovery and effect estimation pipeline.
+    Run complete causal discovery and effect estimation pipeline with adjustment set tracking.
     
     Parameters
     ----------
@@ -673,19 +673,23 @@ def run_pipeline(auto_coeff=0.8, cross_coeff=0.5, noise_sigma=0.5, n_vars=4, T=5
     
     # Estimate causal effects
     effect_results = {}
+    adjustment_sets = {}
+    confidence_intervals = {}
     effect_times = {}
     
     for X, Y in effect_pairs:
         # Format effect pair as string
         effect_key = f"{X[0]}_{X[1]}_to_{Y[0]}_{Y[1]}"
         
-        # Estimate effects
-        effects, times = estimate_all_effects(
+        # Estimate effects with confidence intervals
+        effects, adj_sets, cis, times = estimate_all_effects_with_confidence(
             discovery_results, dataset, X, Y, links, noises,
             save_path=os.path.join(output_dir, f'effects_{effect_key}') if output_dir else None
         )
         
         effect_results[effect_key] = effects
+        adjustment_sets[effect_key] = adj_sets
+        confidence_intervals[effect_key] = cis
         effect_times[effect_key] = times
     
     # Calculate total runtime
@@ -709,6 +713,8 @@ def run_pipeline(auto_coeff=0.8, cross_coeff=0.5, noise_sigma=0.5, n_vars=4, T=5
         'dataset': dataset,
         'discovery': discovery_results,
         'effects': effect_results,
+        'adjustment_sets': adjustment_sets,
+        'confidence_intervals': confidence_intervals,
         'timings': {
             'total': total_time,
             'data_generation': data_time,
@@ -936,6 +942,327 @@ def run_full_study(auto_values=None, cross_values=None, noise_values=None,
     print(f"\nFull parameter study completed in {total_time:.2f} seconds")
     
     return results
+
+def run_extended_parameter_study(param_name, param_values, base_params=None, output_dir=None, seed=None):
+    """
+    Run parameter study varying one parameter with extended parameter options.
+    
+    Parameters
+    ----------
+    param_name : str
+        Name of parameter to vary ('auto', 'cross', 'noise', 'T', 'n_boot')
+    param_values : list
+        List of parameter values to test
+    base_params : dict, optional
+        Base parameters for the study
+    output_dir : str, optional
+        Directory to save results
+    seed : int, optional
+        Base random seed
+        
+    Returns
+    -------
+    dict
+        Study results
+    """
+    # Set default base parameters if not provided
+    if base_params is None:
+        base_params = {
+            'auto_coeff': 0.5,
+            'cross_coeff': 0.5,
+            'noise_sigma': 0.5,
+            'n_vars': 4,
+            'T': 500,
+            'pc_alpha': 0.05,
+            'tau_max': 5,
+            'n_boot': 100,
+            'effect_pairs': [((0, -3), (3, 0))]  # X1(t-3) → X4(t)
+        }
+    
+    # Create timestamp for output directory if not provided
+    if output_dir is None:
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M')
+        output_dir = f"parameter_study_{param_name}_{timestamp}"
+    
+    # Create output directory
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Save study parameters
+    study_params = {
+        'param_name': param_name,
+        'param_values': param_values,
+        'base_params': base_params,
+        'timestamp': datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    }
+    
+    with open(os.path.join(output_dir, 'study_parameters.json'), 'w') as f:
+        json.dump(study_params, f, indent=4)
+    
+    # Run pipeline for each parameter value
+    results = {}
+    overall_timing = {}
+    
+    for i, param_value in enumerate(param_values):
+        print(f"\nRunning {param_name}={param_value} ({i+1}/{len(param_values)})")
+        
+        # Set parameters for this run
+        params = base_params.copy()
+        
+        if param_name == 'auto':
+            params['auto_coeff'] = param_value
+        elif param_name == 'cross':
+            params['cross_coeff'] = param_value
+        elif param_name == 'noise':
+            params['noise_sigma'] = param_value
+        elif param_name == 'T':
+            params['T'] = param_value
+        elif param_name == 'n_boot':
+            params['n_boot'] = param_value
+        else:
+            raise ValueError(f"Unknown parameter: {param_name}")
+        
+        # Create parameter-specific output directory
+        param_dir = os.path.join(output_dir, f"{param_name}_{param_value}")
+        os.makedirs(param_dir, exist_ok=True)
+        
+        # Set seed based on parameter value and base seed
+        if seed is not None:
+            run_seed = seed + i
+        else:
+            run_seed = None
+        
+        # Run pipeline
+        start_time = time.time()
+        result = run_pipeline(
+            auto_coeff=params['auto_coeff'],
+            cross_coeff=params['cross_coeff'],
+            noise_sigma=params['noise_sigma'],
+            n_vars=params['n_vars'],
+            T=params['T'],
+            pc_alpha=params['pc_alpha'],
+            tau_max=params['tau_max'],
+            n_boot=params['n_boot'],
+            effect_pairs=params['effect_pairs'],
+            output_dir=param_dir,
+            seed=run_seed
+        )
+        
+        # Record total time
+        total_time = time.time() - start_time
+        overall_timing[str(param_value)] = total_time
+        
+        results[param_value] = result
+        
+        print(f"  Completed in {total_time:.2f} seconds")
+    
+    # Save overall timing
+    with open(os.path.join(output_dir, 'overall_timing.json'), 'w') as f:
+        json.dump(overall_timing, f, indent=4)
+    
+    return results
+
+def run_full_extended_study(auto_values=None, cross_values=None, noise_values=None, 
+                           T_values=None, n_boot_values=None,
+                           base_params=None, output_dir=None, seed=None):
+    """
+    Run comprehensive parameter study with extended parameter options.
+    
+    Parameters
+    ----------
+    auto_values : list, optional
+        List of autocorrelation values to test
+    cross_values : list, optional
+        List of cross-link values to test
+    noise_values : list, optional
+        List of noise values to test
+    T_values : list, optional
+        List of time series lengths to test
+    n_boot_values : list, optional
+        List of bootstrap replicas to test
+    base_params : dict, optional
+        Base parameters for all studies
+    output_dir : str, optional
+        Directory to save results
+    seed : int, optional
+        Base random seed
+        
+    Returns
+    -------
+    dict
+        Complete study results
+    """
+    # Set default values if not provided
+    if auto_values is None:
+        auto_values = [0.2, 0.5, 0.8, 0.95]
+    if cross_values is None:
+        cross_values = [0.1, 0.3, 0.5, 0.7]
+    if noise_values is None:
+        noise_values = [0.2, 0.5, 1.0, 1.5]
+    if T_values is None:
+        T_values = [200, 500, 1000, 2000]
+    if n_boot_values is None:
+        n_boot_values = [25, 50, 100, 200]
+    
+    # Create timestamp for output directory if not provided
+    if output_dir is None:
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M')
+        output_dir = f"full_extended_study_{timestamp}"
+    
+    # Create output directory
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Save study parameters
+    study_params = {
+        'auto_values': auto_values,
+        'cross_values': cross_values,
+        'noise_values': noise_values,
+        'T_values': T_values,
+        'n_boot_values': n_boot_values,
+        'base_params': base_params,
+        'timestamp': datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    }
+    
+    with open(os.path.join(output_dir, 'full_study_parameters.json'), 'w') as f:
+        json.dump(study_params, f, indent=4)
+    
+    # Run each parameter study
+    results = {}
+    overall_timing = {}
+    
+    # Study 1: Autocorrelation
+    print("\n== AUTOCORRELATION STUDY ==")
+    start_time = time.time()
+    results['auto'] = run_extended_parameter_study(
+        'auto', auto_values, base_params, 
+        os.path.join(output_dir, 'auto_study'),
+        seed=seed if seed is not None else None
+    )
+    auto_time = time.time() - start_time
+    overall_timing['auto_study'] = auto_time
+    print(f"Autocorrelation study completed in {auto_time:.2f} seconds")
+    
+    # Study 2: Cross-link strength
+    print("\n== CROSS-LINK STUDY ==")
+    start_time = time.time()
+    results['cross'] = run_extended_parameter_study(
+        'cross', cross_values, base_params, 
+        os.path.join(output_dir, 'cross_study'),
+        seed=seed+1000 if seed is not None else None
+    )
+    cross_time = time.time() - start_time
+    overall_timing['cross_study'] = cross_time
+    print(f"Cross-link study completed in {cross_time:.2f} seconds")
+    
+    # Study 3: Noise level
+    print("\n== NOISE LEVEL STUDY ==")
+    start_time = time.time()
+    results['noise'] = run_extended_parameter_study(
+        'noise', noise_values, base_params, 
+        os.path.join(output_dir, 'noise_study'),
+        seed=seed+2000 if seed is not None else None
+    )
+    noise_time = time.time() - start_time
+    overall_timing['noise_study'] = noise_time
+    print(f"Noise level study completed in {noise_time:.2f} seconds")
+    
+    # Study 4: Time series length
+    print("\n== TIME SERIES LENGTH STUDY ==")
+    start_time = time.time()
+    results['T'] = run_extended_parameter_study(
+        'T', T_values, base_params, 
+        os.path.join(output_dir, 'T_study'),
+        seed=seed+3000 if seed is not None else None
+    )
+    T_time = time.time() - start_time
+    overall_timing['T_study'] = T_time
+    print(f"Time series length study completed in {T_time:.2f} seconds")
+    
+    # Study 5: Bootstrap replicas
+    print("\n== BOOTSTRAP REPLICAS STUDY ==")
+    start_time = time.time()
+    results['n_boot'] = run_extended_parameter_study(
+        'n_boot', n_boot_values, base_params, 
+        os.path.join(output_dir, 'n_boot_study'),
+        seed=seed+4000 if seed is not None else None
+    )
+    n_boot_time = time.time() - start_time
+    overall_timing['n_boot_study'] = n_boot_time
+    print(f"Bootstrap replicas study completed in {n_boot_time:.2f} seconds")
+    
+    # Save overall timing
+    total_time = auto_time + cross_time + noise_time + T_time + n_boot_time
+    overall_timing['total_time'] = total_time
+    
+    with open(os.path.join(output_dir, 'full_study_timing.json'), 'w') as f:
+        json.dump(overall_timing, f, indent=4)
+    
+    print(f"\nFull extended parameter study completed in {total_time:.2f} seconds")
+    
+    return results
+
+
+
+
+
+def analyze_adjustment_sets(results_df):
+    """
+    Analyze adjustment sets in relation to effect estimation errors.
+    
+    Parameters
+    ----------
+    results_df : pandas.DataFrame
+        DataFrame with estimation results including adjustment sets
+        
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame with analysis results
+    """
+    # Create new DataFrame for analysis
+    analysis_df = pd.DataFrame()
+    
+    # Extract adjustment set sizes for different methods
+    methods = ['true_graph', 'pcmci', 'bagged', 'bootstrap']
+    
+    for method in methods:
+        if method == 'bootstrap':
+            if 'bootstrap_adjustment_set_stats' in results_df.columns:
+                analysis_df[f'{method}_adj_size'] = results_df['bootstrap_adjustment_set_stats'].apply(
+                    lambda x: x.get('mean_size', np.nan) if isinstance(x, dict) else np.nan
+                )
+                analysis_df[f'{method}_adj_std'] = results_df['bootstrap_adjustment_set_stats'].apply(
+                    lambda x: x.get('std_size', np.nan) if isinstance(x, dict) else np.nan
+                )
+        else:
+            # Extract adjustment set size from each method
+            adj_col = f'{method}_adjustment_set'
+            if adj_col in results_df.columns:
+                analysis_df[f'{method}_adj_size'] = results_df[adj_col].apply(
+                    lambda x: len(x) if isinstance(x, list) else np.nan
+                )
+    
+    # Add error metrics for comparison
+    for method in methods:
+        if method == 'bootstrap':
+            error_col = 'bootstrap_error'
+        else:
+            error_col = f'{method}_error'
+        
+        if error_col in results_df.columns:
+            analysis_df[error_col] = results_df[error_col]
+            analysis_df[f'{method}_abs_error'] = results_df[f'{method}_abs_error']
+    
+    # Add parameter information
+    if 'param_name' in results_df.columns:
+        analysis_df['param_name'] = results_df['param_name']
+        analysis_df['param_value'] = results_df['param_value']
+    
+    # Add effect key
+    if 'effect_key' in results_df.columns:
+        analysis_df['effect_key'] = results_df['effect_key']
+    
+    return analysis_df
+
 
 
 # Convert to DataFrames for easier analysis

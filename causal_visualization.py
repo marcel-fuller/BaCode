@@ -989,3 +989,397 @@ def plot_timing_breakdown(results_df, param_name=None, param_value=None, save_pa
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
     
     return fig
+
+# =====================================================================
+# Adjustment Visualization
+# =====================================================================
+
+def plot_adjustment_size_vs_error(analysis_df, method='bagged', param_name=None, save_path=None):
+    """
+    Plot relationship between adjustment set size and error.
+    
+    Parameters
+    ----------
+    analysis_df : pandas.DataFrame
+        DataFrame with adjustment set analysis
+    method : str
+        Method to plot ('pcmci', 'bagged', or 'bootstrap')
+    param_name : str, optional
+        Parameter name to color points by
+    save_path : str, optional
+        Path to save the plot
+        
+    Returns
+    -------
+    matplotlib.figure.Figure
+        The created figure
+    """
+    # Create figure
+    fig, ax = plt.subplots(figsize=(10, 6))
+    
+    # Get columns for plotting
+    size_col = f'{method}_adj_size'
+    error_col = f'{method}_abs_error'
+    
+    # Check if columns exist
+    if size_col not in analysis_df.columns or error_col not in analysis_df.columns:
+        ax.text(0.5, 0.5, f"Data for {method} not available", 
+                ha='center', va='center', fontsize=14)
+        return fig
+    
+    # Create plot DataFrame by filtering NaNs
+    plot_df = analysis_df[[size_col, error_col]].dropna()
+    
+    # Check if DataFrame is empty
+    if len(plot_df) == 0:
+        ax.text(0.5, 0.5, "No valid data points", 
+                ha='center', va='center', fontsize=14)
+        return fig
+    
+    # Add parameter value for coloring if specified
+    if param_name and 'param_name' in analysis_df.columns and 'param_value' in analysis_df.columns:
+        param_df = analysis_df[analysis_df['param_name'] == param_name]
+        
+        if len(param_df) > 0:
+            plot_df = pd.concat([
+                plot_df, 
+                param_df[['param_value']].reset_index(drop=True)
+            ], axis=1)
+            
+            # Create scatter plot with color by parameter
+            scatter = ax.scatter(plot_df[size_col], plot_df[error_col], 
+                               c=plot_df['param_value'], cmap='viridis', 
+                               alpha=0.7, s=50)
+            
+            # Add colorbar
+            cbar = plt.colorbar(scatter, ax=ax)
+            cbar.set_label(f'{param_name.capitalize()} Value')
+        else:
+            # If no parameter data, create simple scatter
+            ax.scatter(plot_df[size_col], plot_df[error_col], alpha=0.7, s=50)
+    else:
+        # Create simple scatter plot
+        ax.scatter(plot_df[size_col], plot_df[error_col], alpha=0.7, s=50)
+    
+    # Add trendline
+    try:
+        sns.regplot(x=size_col, y=error_col, data=plot_df, scatter=False, 
+                   ax=ax, color='red', line_kws={'linestyle':'--'})
+    except:
+        # Skip trendline if it fails
+        pass
+    
+    # Calculate correlation coefficient
+    corr = plot_df[size_col].corr(plot_df[error_col])
+    ax.text(0.05, 0.95, f'Correlation: {corr:.4f}', transform=ax.transAxes, 
+            bbox=dict(facecolor='white', alpha=0.7))
+    
+    # Add labels and title
+    ax.set_xlabel('Adjustment Set Size')
+    ax.set_ylabel('Absolute Error')
+    ax.set_title(f'Adjustment Set Size vs. Error for {method.capitalize()}')
+    
+    # Set integer ticks on x-axis if the range is small
+    if plot_df[size_col].nunique() <= 10:
+        ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
+    
+    plt.tight_layout()
+    
+    # Save if path is provided
+    if save_path:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    
+    return fig
+
+def analyze_bootstrap_graph_diversity(bootstrap_graphs, save_path=None):
+    """
+    Analyze diversity of bootstrap graphs.
+    
+    Parameters
+    ----------
+    bootstrap_graphs : list
+        List of bootstrap graphs
+    save_path : str, optional
+        Path to save results
+        
+    Returns
+    -------
+    dict
+        Dictionary with diversity analysis results
+    """
+    # Convert graphs to hashable format
+    graph_hashes = [str(g) for g in bootstrap_graphs]
+    
+    # Count unique graphs
+    unique_graphs = set(graph_hashes)
+    unique_count = len(unique_graphs)
+    
+    # Count frequency of each unique graph
+    frequency = {}
+    for gh in graph_hashes:
+        if gh in frequency:
+            frequency[gh] += 1
+        else:
+            frequency[gh] = 1
+    
+    # Sort frequencies
+    sorted_freq = sorted(frequency.values(), reverse=True)
+    
+    # Calculate diversity metrics
+    total_graphs = len(bootstrap_graphs)
+    diversity_ratio = unique_count / total_graphs
+    
+    # Compute similarity matrix between all graphs
+    similarity_matrix = np.zeros((total_graphs, total_graphs))
+    
+    for i in range(total_graphs):
+        for j in range(i, total_graphs):
+            # Simple similarity metric: proportion of matching elements
+            match_ratio = np.mean(bootstrap_graphs[i] == bootstrap_graphs[j])
+            similarity_matrix[i, j] = match_ratio
+            similarity_matrix[j, i] = match_ratio
+    
+    # Compute dissimilarity matrix
+    dissimilarity = 1 - similarity_matrix
+    
+    # Calculate average dissimilarity
+    avg_dissimilarity = np.mean(dissimilarity[np.triu_indices(total_graphs, k=1)])
+    
+    # Compute graph statistics
+    edge_density = []
+    for g in bootstrap_graphs:
+        n_edges = np.sum(g != 0)
+        total_possible = g.shape[0] * g.shape[1] * g.shape[2]
+        edge_density.append(n_edges / total_possible)
+    
+    avg_edge_density = np.mean(edge_density)
+    std_edge_density = np.std(edge_density)
+    
+    # Compile results
+    results = {
+        'n_total_graphs': total_graphs,
+        'n_unique_graphs': unique_count,
+        'diversity_ratio': diversity_ratio,
+        'avg_dissimilarity': float(avg_dissimilarity),
+        'top_5_frequencies': sorted_freq[:5] if len(sorted_freq) >= 5 else sorted_freq,
+        'avg_edge_density': float(avg_edge_density),
+        'std_edge_density': float(std_edge_density)
+    }
+    
+    # Save if path is provided
+    if save_path:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        
+        with open(save_path, 'w') as f:
+            json.dump(results, f, indent=4)
+    
+    return results, dissimilarity
+
+def plot_graph_diversity_heatmap(dissimilarity_matrix, save_path=None):
+    """
+    Plot heatmap of graph dissimilarities.
+    
+    Parameters
+    ----------
+    dissimilarity_matrix : numpy.ndarray
+        Matrix of graph dissimilarities
+    save_path : str, optional
+        Path to save the plot
+        
+    Returns
+    -------
+    matplotlib.figure.Figure
+        The created figure
+    """
+    # Create figure
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 7))
+    
+    # Plot dissimilarity heatmap
+    im = ax1.imshow(dissimilarity_matrix, cmap='viridis', aspect='auto')
+    
+    # Add colorbar
+    cbar = plt.colorbar(im, ax=ax1)
+    cbar.set_label('Dissimilarity')
+    
+    # Add labels
+    ax1.set_xlabel('Graph Index')
+    ax1.set_ylabel('Graph Index')
+    ax1.set_title('Graph Dissimilarity Matrix')
+    
+    # Compute linkage matrix for hierarchical clustering
+    condensed_dissimilarity = squareform(dissimilarity_matrix)
+    Z = hierarchy.linkage(condensed_dissimilarity, method='average')
+    
+    # Plot dendrogram
+    dn = hierarchy.dendrogram(Z, ax=ax2)
+    ax2.set_title('Hierarchical Clustering of Graphs')
+    ax2.set_xlabel('Graph Index')
+    ax2.set_ylabel('Distance')
+    
+    plt.tight_layout()
+    
+    # Save if path is provided
+    if save_path:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    
+    return fig
+
+def plot_adjustment_set_stats(results_df, param_name=None, save_path=None):
+    """
+    Plot adjustment set statistics across methods.
+    
+    Parameters
+    ----------
+    results_df : pandas.DataFrame
+        DataFrame with estimation results
+    param_name : str, optional
+        Parameter name to group by
+    save_path : str, optional
+        Path to save the plot
+        
+    Returns
+    -------
+    matplotlib.figure.Figure
+        The created figure
+    """
+    # Create analysis DataFrame
+    analysis_df = analyze_adjustment_sets(results_df)
+    
+    # Create figure
+    fig, ax = plt.subplots(figsize=(12, 6))
+    
+    # Identify adjustment size columns
+    adj_cols = [col for col in analysis_df.columns if col.endswith('_adj_size')]
+    
+    # Create plot data
+    if param_name and param_name in analysis_df.columns:
+        # Filter to only include rows for this parameter
+        param_df = analysis_df[analysis_df['param_name'] == param_name]
+        
+        # Check if DataFrame is empty
+        if len(param_df) == 0:
+            ax.text(0.5, 0.5, f"No data for parameter {param_name}", 
+                    ha='center', va='center', fontsize=14)
+            return fig
+        
+        # Group by parameter value and calculate mean adjustment set size
+        plot_data = param_df.groupby('param_value')[adj_cols].mean().reset_index()
+        
+        # Melt for plotting
+        melt_df = pd.melt(plot_data, id_vars='param_value', value_vars=adj_cols,
+                        var_name='Method', value_name='Adjustment Set Size')
+        
+        # Clean method names
+        melt_df['Method'] = melt_df['Method'].str.replace('_adj_size', '')
+        
+        # Create the plot
+        sns.lineplot(data=melt_df, x='param_value', y='Adjustment Set Size', 
+                    hue='Method', marker='o', ax=ax)
+        
+        ax.set_xlabel(f'{param_name.capitalize()} Value')
+        ax.set_title(f'Adjustment Set Size by {param_name.capitalize()} Value')
+    else:
+        # Calculate mean adjustment set size for each method
+        means = {col.replace('_adj_size', ''): analysis_df[col].mean() for col in adj_cols}
+        stds = {col.replace('_adj_size', ''): analysis_df[col].std() for col in adj_cols}
+        
+        # Create bar plot
+        methods = list(means.keys())
+        values = list(means.values())
+        errors = [stds.get(m, 0) for m in methods]
+        
+        ax.bar(methods, values, yerr=errors, alpha=0.7)
+        
+        # Add value labels on bars
+        for i, v in enumerate(values):
+            ax.text(i, v + 0.1, f'{v:.2f}', ha='center')
+        
+        ax.set_xlabel('Method')
+        ax.set_title('Average Adjustment Set Size by Method')
+    
+    ax.set_ylabel('Adjustment Set Size')
+    ax.grid(axis='y', linestyle='--', alpha=0.7)
+    
+    plt.tight_layout()
+    
+    # Save if path is provided
+    if save_path:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    
+    return fig
+
+def plot_graph_diversity_by_parameter(results_df, param_name, save_path=None):
+    """
+    Plot graph diversity metrics against parameter values.
+    
+    Parameters
+    ----------
+    results_df : pandas.DataFrame
+        DataFrame with estimation results
+    param_name : str
+        Parameter name for x-axis
+    save_path : str, optional
+        Path to save the plot
+        
+    Returns
+    -------
+    matplotlib.figure.Figure
+        The created figure
+    """
+    # Create figure
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+    
+    # Filter DataFrame to get rows for this parameter
+    param_df = results_df[results_df['param_name'] == param_name].copy()
+    
+    # Check if DataFrame is empty
+    if len(param_df) == 0:
+        ax1.text(0.5, 0.5, f"No data for parameter {param_name}", 
+                ha='center', va='center', fontsize=14)
+        return fig
+    
+    # Extract diversity metrics if they're in bootstrap_stats column
+    if 'bootstrap_adjustment_set_stats' in param_df.columns:
+        param_df['unique_graphs'] = param_df['bootstrap_adjustment_set_stats'].apply(
+            lambda x: x.get('unique_graphs', np.nan) if isinstance(x, dict) else np.nan
+        )
+    
+    # Create plot for unique graph count
+    if 'unique_graphs' in param_df.columns:
+        sns.lineplot(data=param_df, x='param_value', y='unique_graphs', 
+                   marker='o', ax=ax1, color='blue')
+        
+        ax1.set_xlabel(f'{param_name.capitalize()} Value')
+        ax1.set_ylabel('Number of Unique Graphs')
+        ax1.set_title(f'Graph Diversity vs {param_name.capitalize()}')
+        ax1.grid(True, linestyle='--', alpha=0.7)
+    else:
+        ax1.text(0.5, 0.5, "No graph diversity data", 
+                ha='center', va='center', fontsize=14)
+    
+    # Plot bootstrap CI width vs parameter value
+    if 'bootstrap_ci_upper' in param_df.columns and 'bootstrap_ci_lower' in param_df.columns:
+        param_df['ci_width'] = param_df['bootstrap_ci_upper'] - param_df['bootstrap_ci_lower']
+        
+        sns.lineplot(data=param_df, x='param_value', y='ci_width', 
+                   marker='o', ax=ax2, color='green')
+        
+        ax2.set_xlabel(f'{param_name.capitalize()} Value')
+        ax2.set_ylabel('Bootstrap CI Width')
+        ax2.set_title(f'Uncertainty vs {param_name.capitalize()}')
+        ax2.grid(True, linestyle='--', alpha=0.7)
+    else:
+        ax2.text(0.5, 0.5, "No bootstrap CI data", 
+                ha='center', va='center', fontsize=14)
+    
+    plt.tight_layout()
+    
+    # Save if path is provided
+    if save_path:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    
+    return fig

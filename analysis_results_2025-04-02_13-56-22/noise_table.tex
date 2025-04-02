@@ -1,0 +1,14 @@
+\begin{table}[htbp]
+\centering
+\caption{Effect Estimation Performance for Varying Noise Level}
+\label{tab:noise_performance}
+\begin{tabular}{l|ccc|ccc|c}
+\hline
+Noise Level & \multicolumn{3}{c|}{MAE} & \multicolumn{3}{c|}{RMSE} & CI Coverage \\
+ Value & PCMCI & Bagged & Bootstrap & PCMCI & Bagged & Bootstrap & Bootstrap \\
+\hline
+0.10 & 0.0757 & nan & 0.0778 & 0.0757 & nan & 0.0778 & 0.0\% \\
+2.00 & 0.0757 & 0.0757 & 0.0771 & 0.0757 & 0.0757 & 0.0771 & 0.0\% \\
+\hline
+\end{tabular}
+\end{table}

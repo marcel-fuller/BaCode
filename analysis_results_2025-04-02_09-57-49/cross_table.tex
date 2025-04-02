@@ -1,0 +1,15 @@
+\begin{table}[htbp]
+\centering
+\caption{Effect Estimation Performance for Varying Cross-link Strength}
+\label{tab:cross_performance}
+\begin{tabular}{l|ccc|ccc|c}
+\hline
+Cross-link Strength & \multicolumn{3}{c|}{MAE} & \multicolumn{3}{c|}{RMSE} & CI Coverage \\
+ Value & PCMCI & Bagged & Bootstrap & PCMCI & Bagged & Bootstrap & Bootstrap \\
+\hline
+0.01 & nan & nan & 0.0095 & nan & nan & 0.0095 & 0.0\% \\
+0.53 & 0.0136 & 0.0136 & 0.0146 & 0.0136 & 0.0136 & 0.0146 & 0.0\% \\
+0.99 & 0.0234 & 0.0255 & 0.0155 & 0.0234 & 0.0255 & 0.0155 & 0.0\% \\
+\hline
+\end{tabular}
+\end{table}

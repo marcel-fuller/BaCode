@@ -149,12 +149,19 @@ def load_effect_results(base_path):
     """
     # Look for overall results file
     all_path = f"{base_path}_all.json"
-    if os.path.exists(all_path):
+    if False:#os.path.exists(all_path):
         with open(all_path, 'r') as f:
             return json.load(f)
     
     # If overall file doesn't exist, try to load individual files
     results = {}
+    
+    # Load True_graph effect
+    true_graph_path = f"{base_path}_true_graph.json"
+    if os.path.exists(true_graph_path):
+        with open(true_graph_path, 'r') as f:
+            true_graph_data = json.load(f)
+            results['true_graph_effect'] = true_graph_data.get('effect')
     
     # Load PCMCI effect
     pcmci_path = f"{base_path}_pcmci.json"
@@ -180,6 +187,93 @@ def load_effect_results(base_path):
     
     return results
 
+
+# Modified version of load_experiment_results that tracks file paths
+def modified_load_experiment_results(directory, param_name=None, param_value=None):
+    """
+    Load experiment results from a directory, including file paths.
+    
+    Parameters
+    ----------
+    directory : str
+        Directory containing experiment results
+    param_name : str, optional
+        Filter by parameter name
+    param_value : float, optional
+        Filter by parameter value
+        
+    Returns
+    -------
+    dict
+        Dictionary with experiment results
+    """
+    # Define path pattern based on filters
+    if param_name and param_value:
+        pattern = os.path.join(directory, f"{param_name}_{param_value}", "*_all.json")
+    elif param_name:
+        pattern = os.path.join(directory, f"{param_name}_*", "*_all.json")
+    else:
+        pattern = os.path.join(directory, "*", "*_all.json")
+    
+    # Find all matching result files
+    results_files = glob.glob(pattern)
+    
+    # Load data from each file
+    experiment_results = {}
+    for file_path in results_files:
+        # Extract parameter info from directory path
+        parts = file_path.split(os.sep)
+        param_dir = parts[-2]  # Directory name contains parameter info
+        
+        param_parts = param_dir.split('_')
+        if len(param_parts) >= 2:
+            current_param_name = param_parts[0]
+            try:
+                current_param_value = float(param_parts[1])
+            except ValueError:
+                # Skip if parameter value is not a number
+                continue
+        else:
+            # Skip if directory doesn't follow the expected pattern
+            continue
+        
+        # Skip if doesn't match filters
+        if param_name and current_param_name != param_name:
+            continue
+        if param_value is not None and current_param_value != param_value:
+            continue
+        
+        # Read results
+        with open(file_path, 'r') as f:
+            results = json.load(f)
+        
+        # Add file path to results
+        results['_file_path'] = file_path
+        
+        # Look for corresponding bootstrap file
+        bootstrap_file = file_path.replace('_all.json', '_bootstrap.json')
+        if os.path.exists(bootstrap_file):
+            try:
+                with open(bootstrap_file, 'r') as f:
+                    bootstrap_data = json.load(f)
+                    # Add bootstrap effects directly to results
+                    if 'bootstrap_effects' in bootstrap_data:
+                        results['bootstrap_effects'] = bootstrap_data['bootstrap_effects']
+            except Exception as e:
+                print(f"Error loading bootstrap file {bootstrap_file}: {e}")
+        
+        # Extract effect pair from filename
+        effect_key = os.path.basename(file_path).split('_all.json')[0]
+        if effect_key.startswith('effects_'):
+            effect_key = effect_key[8:]  # Remove 'effects_' prefix
+        
+        # Store results
+        if current_param_value not in experiment_results:
+            experiment_results[current_param_value] = {}
+        
+        experiment_results[current_param_value][effect_key] = results
+    
+    return experiment_results
 
 def load_experiment_results(directory, param_name=None, param_value=None):
     """
@@ -303,6 +397,7 @@ def load_all_results_to_dataframe(directory):
             'Y': Y,
             'effect_key': effect_str,
             'true_effect': results.get('true_effect'),
+            'true_graph_effect': results.get('true_graph_effect'),
             'pcmci_effect': results.get('pcmci_effect'),
             'bagged_effect': results.get('bagged_effect')
         }
@@ -375,7 +470,7 @@ def calculate_metrics(results_df, group_by=None):
     """
     # Define metrics to calculate
     metrics = {}
-    for method in ['pcmci', 'bagged', 'bootstrap']:
+    for method in ['true_graph','pcmci', 'bagged', 'bootstrap']:
         abs_error_col = f'{method}_abs_error'
         squared_error_col = f'{method}_squared_error'
         error_col = f'{method}_error'
@@ -391,6 +486,8 @@ def calculate_metrics(results_df, group_by=None):
     # Add CI coverage for bootstrap
     if 'ci_covers_true' in results_df.columns:
         metrics['bootstrap_ci_coverage'] = pd.NamedAgg(column='ci_covers_true', aggfunc='mean')
+    
+    print (methods)
     
     # Group if specified
     if group_by:
@@ -426,6 +523,7 @@ def evaluate_estimation_performance(all_effects):
         pair_results = {
             'pcmci': {'values': [], 'errors': []},
             'bagged': {'values': [], 'errors': []},
+            'true_graph': {'values': [], 'errors': []},
             'bootstrap': {'values': [], 'errors': [], 'ci_coverage': []}
         }
         
@@ -437,6 +535,11 @@ def evaluate_estimation_performance(all_effects):
                 true_effect = effect_data.get('true_effect')
                 if true_effect is None:
                     continue
+                
+                true_graph_effect = effect_data.get('true_graph_effect')
+                if true_graph_effect is not None and not np.isnan(true_graph_effect):
+                    pair_results['true_graph']['values'].append(true_graph_effect)
+                    pair_results['true_graph']['errors'].append(true_graph_effect - true_effect)
                 
                 # PCMCI
                 pcmci_effect = effect_data.get('pcmci_effect')
@@ -466,7 +569,7 @@ def evaluate_estimation_performance(all_effects):
         
         # Calculate metrics for each method
         pair_metrics = {}
-        for method in ['pcmci', 'bagged', 'bootstrap']:
+        for method in ['pcmci', 'bagged', 'bootstrap','true_graph']:
             method_metrics = {}
             
             errors = np.array(pair_results[method]['errors'])
@@ -833,3 +936,100 @@ def run_full_study(auto_values=None, cross_values=None, noise_values=None,
     print(f"\nFull parameter study completed in {total_time:.2f} seconds")
     
     return results
+
+
+# Convert to DataFrames for easier analysis
+def results_to_dataframe(results_dict, param_name):
+    rows = []
+    
+    for param_value, effect_dict in results_dict.items():
+        for effect_key, effect_data in effect_dict.items():
+            # Extract data
+            row = {
+                'param_name': param_name,
+                'param_value': param_value,
+                'effect_key': effect_key,
+                'true_effect': effect_data.get('true_effect'),
+                'true_graph_effect': effect_data.get('true_graph_effect'),
+                'pcmci_effect': effect_data.get('pcmci_effect'),
+                'bagged_effect': effect_data.get('bagged_effect')
+            }
+            
+            # Add bootstrap statistics if available
+            bootstrap_stats = effect_data.get('bootstrap_stats', {})
+            if bootstrap_stats:
+                row.update({
+                    'bootstrap_mean': bootstrap_stats.get('mean'),
+                    'bootstrap_std': bootstrap_stats.get('std'),
+                    'bootstrap_ci_lower': bootstrap_stats.get('ci_lower'),
+                    'bootstrap_ci_upper': bootstrap_stats.get('ci_upper'),
+                    'bootstrap_success_rate': bootstrap_stats.get('estimation_success_rate')
+                })
+            
+            # Add bootstrap effects if available
+            if 'bootstrap_effects' in effect_data:
+                row['bootstrap_effects'] = effect_data['bootstrap_effects']
+            
+            # Add timing information if available
+            timings = effect_data.get('timings', {})
+            if timings:
+                for method, time_val in timings.items():
+                    row[f'{method}_time'] = time_val
+            
+            rows.append(row)
+    
+    # Create DataFrame
+    df = pd.DataFrame(rows)
+    
+    # Add error columns
+    for method in ['true_graph','pcmci', 'bagged', 'bootstrap']:
+        if method == 'bootstrap':
+            effect_col = 'bootstrap_mean'
+        else:
+            effect_col = f'{method}_effect'
+        
+        # Skip if column doesn't exist
+        if effect_col not in df.columns:
+            continue
+        
+        # Calculate errors - handle NaN values safely
+        df[f'{method}_error'] = df[effect_col].subtract(df['true_effect'], fill_value=np.nan)
+        df[f'{method}_abs_error'] = df[f'{method}_error'].abs()
+        df[f'{method}_squared_error'] = df[f'{method}_error'].pow(2)
+        
+        # Flag if true effect is within CI (for bootstrap)
+        if method == 'bootstrap' and 'bootstrap_ci_lower' in df.columns and 'bootstrap_ci_upper' in df.columns:
+            df['ci_covers_true'] = (df['true_effect'] >= df['bootstrap_ci_lower']) & \
+                                  (df['true_effect'] <= df['bootstrap_ci_upper'])
+    
+    return df
+        
+        
+# Example usage
+if __name__ == "__main__":
+    # Set the main study folder path
+    main_study_folder = "full_study_results_2025-04-01_18-05-50"
+    
+    # Create a results folder for the analysis
+    results_folder = f"analysis_results_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+    os.makedirs(results_folder, exist_ok=True)
+    
+    print(f"Loading results from {main_study_folder}...")
+    
+    # Load parameter studies using the modified function
+    print("Loading autocorrelation study...")
+    auto_results = modified_load_experiment_results(os.path.join(main_study_folder, "auto_study"), "auto")
+    
+    # Convert to DataFrame
+    auto_df = results_to_dataframe(auto_results, "auto")
+    
+    # Check if bootstrap effects were loaded
+    print(f"Bootstrap effects loaded for {sum('bootstrap_effects' in row for _, row in auto_df.iterrows())} rows")
+    
+    # Print first row with bootstrap effects to verify
+    bootstrap_rows = auto_df[auto_df['bootstrap_effects'].notna()]
+    if not bootstrap_rows.empty:
+        row = bootstrap_rows.iloc[0]
+        print(f"Sample bootstrap effects for {row['effect_key']} at {row['param_name']}={row['param_value']}:")
+        print(f"Number of bootstrap samples: {len(row['bootstrap_effects'])}")
+        print(f"Sample values: {row['bootstrap_effects'][:3]}...")

@@ -458,7 +458,7 @@ def plot_effect_comparison(results_df, param_name=None, effect_key=None,
     """
     # Set default methods if not provided
     if methods is None:
-        methods = ['pcmci', 'bagged', 'bootstrap']
+        methods = ['true_graph','pcmci', 'bagged', 'bootstrap']
     
     # Filter DataFrame if effect_key is provided
     if effect_key is not None:
@@ -588,7 +588,7 @@ def plot_error_comparison(results_df, param_name=None, effect_key=None,
     """
     # Set default methods if not provided
     if methods is None:
-        methods = ['pcmci', 'bagged', 'bootstrap']
+        methods = ['true_graph','pcmci', 'bagged', 'bootstrap']
     
     # Map error type to column suffix
     error_col_map = {
@@ -710,7 +710,7 @@ def plot_metrics_comparison(results_df, param_name=None, metric='mae',
     """
     # Set default methods if not provided
     if methods is None:
-        methods = ['pcmci', 'bagged', 'bootstrap']
+        methods = ['true_graph','pcmci', 'bagged', 'bootstrap']
     
     # Create plot DataFrame
     plot_df = results_df.copy()

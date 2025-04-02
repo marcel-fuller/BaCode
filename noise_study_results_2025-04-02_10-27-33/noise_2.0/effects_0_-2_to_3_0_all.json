@@ -1,0 +1,30 @@
+{
+    "X": [
+        0,
+        -2
+    ],
+    "Y": [
+        3,
+        0
+    ],
+    "true_effect": 0.7500001788139343,
+    "true_graph_effect": 0.7367469668388367,
+    "pcmci_effect": 0.7369506359100342,
+    "bagged_effect": 0.7366216778755189,
+    "bootstrap_stats": {
+        "mean": 0.7354253401358922,
+        "std": 0.0009507111763521159,
+        "ci_lower": 0.7351797453966791,
+        "ci_upper": 0.7356709348751054,
+        "n_total": 200,
+        "n_nan": 140,
+        "estimation_success_rate": 0.3
+    },
+    "timings": {
+        "true_effect": 0.11539316177368164,
+        "true_graph_effect": 0.4848623275756836,
+        "pcmci_effect": 2.360769271850586,
+        "bagged_effect": 1.7748322486877441,
+        "bootstrap_effects": 220.4347665309906
+    }
+}

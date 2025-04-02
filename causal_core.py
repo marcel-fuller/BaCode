@@ -712,12 +712,12 @@ def estimate_bootstrap_effects(bootstrap_graphs, dataframe, X, Y, save_path=None
         # If all values are NaN, return special case
         if n_nan == len(effects):
             stats = {
-                'mean': np.nan,
-                'std': np.nan,
-                'ci_lower': np.nan,
-                'ci_upper': np.nan,
-                'n_total': len(effects),
-                'n_nan': n_nan,
+                'mean': None,
+                'std': None,
+                'ci_lower': None,
+                'ci_upper': None,
+                'n_total': int(len(effects)),
+                'n_nan': None,
                 'estimation_success_rate': 0.0
             }
         else:
@@ -755,7 +755,6 @@ def estimate_bootstrap_effects(bootstrap_graphs, dataframe, X, Y, save_path=None
             'stats': stats,
             'estimation_time': timer.elapsed
         }
-        
         with open(save_path, 'w') as f:
             json.dump(result, f, indent=4)
     
@@ -802,6 +801,16 @@ def estimate_all_effects(discovery_results, dataframe, X, Y, links=None, noises=
         results['true_effect'] = true_effect
         timings['true_effect'] = true_time
     
+    # Estimate with True Graph
+    if links is not None:
+        true_graph = PCMCI.get_graph_from_dict(links)
+        true_graph_effect, true_graph_time = estimate_causal_effect(
+            true_graph, dataframe, X, Y, 
+            save_path=f"{save_path}_true_graph.json" if save_path else None
+        )
+        results['true_graph_effect'] = true_graph_effect
+        timings['true_graph_effect'] = true_graph_time
+    
     # Estimate with PCMCI graph
     pcmci_graph = discovery_results['pcmci']['graph']
     pcmci_effect, pcmci_time = estimate_causal_effect(
@@ -839,6 +848,7 @@ def estimate_all_effects(discovery_results, dataframe, X, Y, links=None, noises=
             'X': X,
             'Y': Y,
             'true_effect': float(results['true_effect']) if 'true_effect' in results else None,
+            'true_graph_effect': float(results['true_graph_effect']) if 'true_effect' in results else None,
             'pcmci_effect': float(pcmci_effect) if not np.isnan(pcmci_effect) else None,
             'bagged_effect': float(bagged_effect) if not np.isnan(bagged_effect) else None,
             'bootstrap_stats': results['bootstrap_stats'] if 'bootstrap_stats' in results else None,

@@ -1263,6 +1263,163 @@ def analyze_adjustment_sets(results_df):
     
     return analysis_df
 
+def analyze_linreg_ci_statistics(df, save_path=None):
+    """
+    Perform statistical analysis of linear regression confidence interval properties.
+    
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame containing study results with CI information
+    save_path : str, optional
+        Path to save the analysis results
+        
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame with detailed CI statistics
+    """
+    import pandas as pd
+    import numpy as np
+    import scipy.stats as stats
+    import os
+    
+    # Define the methods to analyze
+    methods = ['true_graph', 'pcmci', 'bagged']
+    method_labels = ['True Graph', 'PCMCI', 'Bagged PCMCI']
+    
+    # Filter to only include rows with the necessary data
+    valid_df = df.dropna(subset=['true_effect']).copy()
+    
+    if len(valid_df) == 0:
+        print("No valid data with true effects found for CI analysis")
+        return pd.DataFrame()
+    
+    # Prepare results container
+    results = []
+    
+    # Loop through parameter types
+    param_names = valid_df['param_name'].unique()
+    
+    for param_name in param_names:
+        param_df = valid_df[valid_df['param_name'] == param_name]
+        param_values = sorted(param_df['param_value'].unique())
+        
+        for param_value in param_values:
+            subset = param_df[param_df['param_value'] == param_value]
+            
+            if len(subset) == 0:
+                continue
+            
+            # Analyze each method
+            for method, label in zip(methods, method_labels):
+                lower_col = f'{method}_ci_lower'
+                upper_col = f'{method}_ci_upper'
+                effect_col = f'{method}_effect'
+                
+                if not all(col in subset.columns for col in [lower_col, upper_col, effect_col]):
+                    continue
+                
+                # Filter rows with valid data for this method
+                method_rows = subset.dropna(subset=[lower_col, upper_col, effect_col, 'true_effect'])
+                
+                if len(method_rows) == 0:
+                    continue
+                
+                # Calculate CI properties
+                ci_widths = method_rows[upper_col] - method_rows[lower_col]
+                errors = np.abs(method_rows[effect_col] - method_rows['true_effect'])
+                
+                # Calculate coverage
+                covers = ((method_rows['true_effect'] >= method_rows[lower_col]) & 
+                        (method_rows['true_effect'] <= method_rows[upper_col]))
+                
+                coverage_rate = covers.mean() * 100
+                
+                # Calculate statistic to error ratio (ideal is around 2 for 95% CI)
+                width_error_ratios = ci_widths / errors.replace(0, np.nan)
+                
+                # Calculate deviation of CI center from true effect
+                ci_centers = (method_rows[upper_col] + method_rows[lower_col]) / 2
+                center_deviations = ci_centers - method_rows['true_effect']
+                
+                # Collect statistics
+                stats_row = {
+                    'param_name': param_name,
+                    'param_value': param_value,
+                    'method': label,
+                    'sample_size': len(method_rows),
+                    
+                    # CI width statistics
+                    'mean_ci_width': ci_widths.mean(),
+                    'median_ci_width': ci_widths.median(),
+                    'std_ci_width': ci_widths.std(),
+                    'min_ci_width': ci_widths.min(),
+                    'max_ci_width': ci_widths.max(),
+                    
+                    # Error statistics
+                    'mean_error': errors.mean(),
+                    'median_error': errors.median(),
+                    'std_error': errors.std(),
+                    
+                    # Width to error ratio statistics
+                    'mean_width_error_ratio': width_error_ratios.mean(),
+                    'median_width_error_ratio': width_error_ratios.median(),
+                    
+                    # Coverage statistics
+                    'coverage_rate': coverage_rate,
+                    'coverage_std_error': np.sqrt((coverage_rate/100) * (1 - coverage_rate/100) / len(method_rows)) * 100,
+                    'coverage_95ci_lower': max(0, coverage_rate - 1.96 * np.sqrt((coverage_rate/100) * (1 - coverage_rate/100) / len(method_rows)) * 100),
+                    'coverage_95ci_upper': min(100, coverage_rate + 1.96 * np.sqrt((coverage_rate/100) * (1 - coverage_rate/100) / len(method_rows)) * 100),
+                    
+                    # Center deviation statistics
+                    'mean_center_deviation': center_deviations.mean(),
+                    'mean_abs_center_deviation': np.abs(center_deviations).mean(),
+                    
+                    # CI reliability metrics
+                    'calibration_score': np.abs(coverage_rate - 95),  # Lower is better (closer to 95%)
+                    'efficiency_score': ci_widths.mean() / errors.mean(),  # Should be close to 2 for 95% CI
+                }
+                
+                # Test if coverage is significantly different from 95%
+                p_value = stats.binom_test(
+                    x=int(covers.sum()), 
+                    n=len(covers), 
+                    p=0.95, 
+                    alternative='two-sided'
+                )
+                stats_row['coverage_differs_from_95_pvalue'] = p_value
+                stats_row['coverage_is_valid'] = p_value > 0.05  # Not significantly different from 95%
+                
+                results.append(stats_row)
+    
+    # Convert to DataFrame
+    results_df = pd.DataFrame(results)
+    
+    # Save if path is provided
+    if save_path and len(results_df) > 0:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        
+        # Save as CSV
+        results_df.to_csv(save_path, index=False)
+        
+        # Also save a summary grouped by method
+        summary_df = results_df.groupby('method').agg({
+            'sample_size': 'sum',
+            'mean_ci_width': 'mean',
+            'mean_error': 'mean',
+            'mean_width_error_ratio': 'mean',
+            'coverage_rate': 'mean',
+            'coverage_is_valid': lambda x: (x == True).mean() * 100,
+            'calibration_score': 'mean',
+            'efficiency_score': 'mean'
+        }).reset_index()
+        
+        summary_df.rename(columns={'coverage_is_valid': 'percent_valid_coverage'}, inplace=True)
+        
+        summary_df.to_csv(save_path.replace('.csv', '_summary.csv'), index=False)
+    
+    return results_df
 
 
 # Convert to DataFrames for easier analysis
@@ -1330,7 +1487,365 @@ def results_to_dataframe(results_dict, param_name):
                                   (df['true_effect'] <= df['bootstrap_ci_upper'])
     
     return df
+
+
+def load_study_results(study_folder, output_folder=None):
+    """
+    Load all results from a study folder structure into a comprehensive DataFrame.
+    
+    Parameters
+    ----------
+    study_folder : str
+        Path to the main study folder containing substudy folders
+    output_folder : str, optional
+        Path to save the DataFrame as CSV
         
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame with all study results
+    """
+
+    
+    print(f"Loading study results from {study_folder}...")
+    
+    # Find all substudy folders
+    substudy_folders = [f for f in glob.glob(os.path.join(study_folder, "*")) 
+                        if os.path.isdir(f) and not f.endswith("_results")]
+    
+    if not substudy_folders:
+        raise ValueError(f"No substudy folders found in {study_folder}")
+    
+    print(f"Found {len(substudy_folders)} substudy folders")
+    
+    # Initialize list to collect all rows
+    all_rows = []
+    
+    # Process each substudy folder
+    for substudy_folder in substudy_folders:
+        substudy_name = os.path.basename(substudy_folder)
+        print(f"Processing substudy: {substudy_name}")
+        
+        # Extract parameter name (e.g., 'auto', 'cross', 'noise')
+        param_name = substudy_name.split('_')[0] if '_' in substudy_name else substudy_name
+        
+        # Find all parameter value folders
+        param_folders = [f for f in glob.glob(os.path.join(substudy_folder, "*")) 
+                         if os.path.isdir(f)]
+        
+        # Process each parameter value folder
+        for param_folder in param_folders:
+            folder_name = os.path.basename(param_folder)
+            
+            # Extract parameter value from folder name
+            param_parts = folder_name.split('_')
+            if len(param_parts) >= 2:
+                try:
+                    param_value = float(param_parts[-1])
+                except ValueError:
+                    print(f"  Skipping folder {folder_name} - cannot parse parameter value")
+                    continue
+            else:
+                print(f"  Skipping folder {folder_name} - unexpected naming format")
+                continue
+            
+            print(f"  Processing parameter value: {param_value}")
+            
+            # Load parameters.json
+            params_file = os.path.join(param_folder, "parameters.json")
+            if os.path.exists(params_file):
+                with open(params_file, 'r') as f:
+                    parameters = json.load(f)
+            else:
+                parameters = {}
+                print(f"  Warning: parameters.json not found in {param_folder}")
+            
+            # Load timing_summary.json if available
+            timing_summary_file = os.path.join(param_folder, "timing_summary.json")
+            if os.path.exists(timing_summary_file):
+                with open(timing_summary_file, 'r') as f:
+                    timing_summary = json.load(f)
+            else:
+                timing_summary = {}
+                print(f"  Warning: timing_summary.json not found in {param_folder}")
+            
+            # Find all effect result files
+            effect_files = glob.glob(os.path.join(param_folder, "effects_*_all.json"))
+            
+            # Process each effect file
+            for effect_file in effect_files:
+                effect_basename = os.path.basename(effect_file)
+                effect_key = effect_basename.replace("effects_", "").replace("_all.json", "")
+                
+                # Parse X and Y from effect key
+                try:
+                    x_part, y_part = effect_key.split("_to_")
+                    X_var, X_lag = map(int, x_part.split('_'))
+                    Y_var, Y_lag = map(int, y_part.split('_'))
+                    X = (X_var, X_lag)
+                    Y = (Y_var, Y_lag)
+                except:
+                    # If parsing fails, use placeholders
+                    X = None
+                    Y = None
+                    print(f"  Warning: Could not parse X and Y from effect key: {effect_key}")
+                
+                # Load effect results
+                with open(effect_file, 'r') as f:
+                    effect_data = json.load(f)
+                
+                # Create base row with parameter and effect information
+                row = {
+                    'substudy': substudy_name,
+                    'param_name': param_name,
+                    'param_value': param_value,
+                    'effect_key': effect_key,
+                    'X': str(X),
+                    'Y': str(Y),
+                    'X_var': X_var if X is not None else None,
+                    'X_lag': X_lag if X is not None else None,
+                    'Y_var': Y_var if Y is not None else None,
+                    'Y_lag': Y_lag if Y is not None else None,
+                }
+                
+                # Add parameters from parameters.json
+                for key, value in parameters.items():
+                    if key not in ['effect_pairs']:  # Skip complex objects
+                        row[f'param_{key}'] = value
+                
+                # Add effect estimation results
+                row.update({
+                    'true_effect': effect_data.get('true_effect'),
+                    'true_graph_effect': effect_data.get('true_graph_effect'),
+                    'pcmci_effect': effect_data.get('pcmci_effect'),
+                    'bagged_effect': effect_data.get('bagged_effect')
+                })
+                
+                # Add linear regression confidence intervals for each method
+                if 'confidence_intervals' in effect_data:
+                    ci_data = effect_data.get('confidence_intervals', {})
+                    
+                    # Add true_graph CI
+                    if 'true_graph' in ci_data and len(ci_data['true_graph']) == 2:
+                        row['true_graph_linreg_ci_lower'] = ci_data['true_graph'][0]
+                        row['true_graph_linreg_ci_upper'] = ci_data['true_graph'][1]
+                    
+                    # Add pcmci CI
+                    if 'pcmci' in ci_data and len(ci_data['pcmci']) == 2:
+                        row['pcmci_linreg_ci_lower'] = ci_data['pcmci'][0]
+                        row['pcmci_linreg_ci_upper'] = ci_data['pcmci'][1]
+                    
+                    # Add bagged CI
+                    if 'bagged' in ci_data and len(ci_data['bagged']) == 2:
+                        row['bagged_linreg_ci_lower'] = ci_data['bagged'][0]
+                        row['bagged_linreg_ci_upper'] = ci_data['bagged'][1]
+                        
+                    # Add bootstrap linreg CI summary statistics
+                    if 'bootstrap_summary' in ci_data:
+                        bootstrap_ci_summary = ci_data['bootstrap_summary']
+                        row.update({
+                            'bootstrap_linreg_ci_mean_width': bootstrap_ci_summary.get('mean_width'),
+                            'bootstrap_linreg_ci_std_width': bootstrap_ci_summary.get('std_width'),
+                            'bootstrap_linreg_ci_min_width': bootstrap_ci_summary.get('min_width'),
+                            'bootstrap_linreg_ci_max_width': bootstrap_ci_summary.get('max_width')
+                        })
+                
+                # Add timing information from timing_summary.json
+                if timing_summary:
+                    # Add overall timing
+                    if 'total_time' in timing_summary:
+                        row['total_time'] = timing_summary['total_time']
+                    
+                    # Add data generation time
+                    if 'data_generation_time' in timing_summary:
+                        row['data_generation_time'] = timing_summary['data_generation_time']
+                    
+                    # Add discovery times
+                    if 'discovery_times' in timing_summary:
+                        discovery_times = timing_summary['discovery_times']
+                        for method, time_value in discovery_times.items():
+                            row[f'discovery_{method}_time'] = time_value
+                    
+                    # Add effect estimation times per pair (if available)
+                    if 'effect_times' in timing_summary and effect_key in timing_summary['effect_times']:
+                        effect_times = timing_summary['effect_times'][effect_key]
+                        for method, time_value in effect_times.items():
+                            row[f'effect_{method}_time'] = time_value
+                
+                # Add timing information from effect file
+                if 'timings' in effect_data:
+                    for method, time_value in effect_data['timings'].items():
+                        row[f'{method}_time'] = time_value
+                
+                # Load bootstrap results to get individual estimates and CIs
+                bootstrap_file = effect_file.replace("_all.json", "_bootstrap.json")
+                if os.path.exists(bootstrap_file):
+                    with open(bootstrap_file, 'r') as f:
+                        bootstrap_data = json.load(f)
+                    
+                    # Add individual bootstrap estimates
+                    row['bootstrap_effects'] = bootstrap_data.get('bootstrap_effects', [])
+                    
+                    # Add individual bootstrap linreg confidence intervals
+                    row['bootstrap_replica_ci_lower'] = [ci[0] if ci[0] is not None else None for ci in bootstrap_data.get('confidence_intervals', [])]
+                    row['bootstrap_replica_ci_upper'] = [ci[1] if ci[1] is not None else None for ci in bootstrap_data.get('confidence_intervals', [])]
+                    
+                    # Combine with estimates to create a list of (estimate, ci_lower, ci_upper) tuples
+                    effects = bootstrap_data.get('bootstrap_effects', [])
+                    ci_lower = row['bootstrap_replica_ci_lower']
+                    ci_upper = row['bootstrap_replica_ci_upper']
+                    
+                    # Make sure the lists have the same length
+                    min_len = min(len(effects), len(ci_lower), len(ci_upper))
+                    valid_estimates_with_ci = [
+                        (effects[i], ci_lower[i], ci_upper[i]) 
+                        for i in range(min_len) 
+                        if effects[i] is not None and ci_lower[i] is not None and ci_upper[i] is not None
+                    ]
+                    row['bootstrap_replica_estimate_with_ci'] = valid_estimates_with_ci
+                    
+                    # Calculate combined CI from all valid replica CIs
+                    if valid_estimates_with_ci:
+                        # Extract valid CIs
+                        valid_ci_lower = [item[1] for item in valid_estimates_with_ci]
+                        valid_ci_upper = [item[2] for item in valid_estimates_with_ci]
+                        
+                        # Calculate mean of lower and upper bounds
+                        combined_ci_lower = sum(valid_ci_lower) / len(valid_ci_lower)
+                        combined_ci_upper = sum(valid_ci_upper) / len(valid_ci_upper)
+                        
+                        # Calculate the most conservative CI (minimum of lower bounds, maximum of upper bounds)
+                        conservative_ci_lower = min(valid_ci_lower)
+                        conservative_ci_upper = max(valid_ci_upper)
+                        
+                        # Add to row
+                        row['bootstrap_combined_ci_lower'] = combined_ci_lower
+                        row['bootstrap_combined_ci_upper'] = combined_ci_upper
+                        row['bootstrap_combined_ci_width'] = combined_ci_upper - combined_ci_lower
+                        
+                        row['bootstrap_conservative_ci_lower'] = conservative_ci_lower
+                        row['bootstrap_conservative_ci_upper'] = conservative_ci_upper
+                        row['bootstrap_conservative_ci_width'] = conservative_ci_upper - conservative_ci_lower
+                        
+                        # Check if true effect is within the combined CIs if true_effect is available
+                        if 'true_effect' in row and row['true_effect'] is not None:
+                            row['bootstrap_combined_ci_covers_true'] = (
+                                row['true_effect'] >= combined_ci_lower and 
+                                row['true_effect'] <= combined_ci_upper
+                            )
+                            row['bootstrap_conservative_ci_covers_true'] = (
+                                row['true_effect'] >= conservative_ci_lower and 
+                                row['true_effect'] <= conservative_ci_upper
+                            )
+                    
+                    # Add bootstrap statistics for bootstrap-derived confidence intervals
+                    bootstrap_stats = bootstrap_data.get('stats', {})
+                    if bootstrap_stats:
+                        row.update({
+                            'bootstrap_mean': bootstrap_stats.get('mean'),
+                            'bootstrap_std': bootstrap_stats.get('std'),
+                            'bootstrap_ci_lower': bootstrap_stats.get('ci_lower'),
+                            'bootstrap_ci_upper': bootstrap_stats.get('ci_upper'),
+                            'bootstrap_success_rate': bootstrap_stats.get('estimation_success_rate'),
+                            'bootstrap_n_total': bootstrap_stats.get('n_total'),
+                            'bootstrap_n_nan': bootstrap_stats.get('n_nan')
+                        })
+                    
+                    # Add bootstrap adjustment set statistics
+                    if 'adjustment_set_stats' in bootstrap_data:
+                        adj_stats = bootstrap_data['adjustment_set_stats']
+                        row.update({
+                            'bootstrap_adj_mean_size': adj_stats.get('mean_size'),
+                            'bootstrap_adj_std_size': adj_stats.get('std_size'),
+                            'bootstrap_adj_min_size': adj_stats.get('min_size'),
+                            'bootstrap_adj_max_size': adj_stats.get('max_size'),
+                            'bootstrap_unique_graphs': adj_stats.get('unique_graphs')
+                        })
+                    
+                    # Add bootstrap estimation time
+                    if 'estimation_time' in bootstrap_data:
+                        row['bootstrap_estimation_time'] = bootstrap_data['estimation_time']
+                
+                # Load additional timing information from individual method files
+                for method in ['pcmci', 'bagged', 'true_graph']:
+                    method_file = effect_file.replace("_all.json", f"_{method}.json")
+                    if os.path.exists(method_file):
+                        with open(method_file, 'r') as f:
+                            method_data = json.load(f)
+                        
+                        # Add method-specific estimation time
+                        if 'estimation_time' in method_data:
+                            row[f'{method}_estimation_time'] = method_data['estimation_time']
+                        
+                        # Add method-specific adjustment set size
+                        if 'adjustment_set_size' in method_data:
+                            row[f'{method}_adjustment_set_size'] = method_data['adjustment_set_size']
+                
+                # Calculate errors and coverage
+                if 'true_effect' in row and row['true_effect'] is not None:
+                    # Calculate PCMCI errors
+                    if 'pcmci_effect' in row and row['pcmci_effect'] is not None:
+                        row['pcmci_error'] = row['pcmci_effect'] - row['true_effect']
+                        row['pcmci_abs_error'] = abs(row['pcmci_error'])
+                        row['pcmci_squared_error'] = row['pcmci_error'] ** 2
+                    
+                    # Calculate bagged errors
+                    if 'bagged_effect' in row and row['bagged_effect'] is not None:
+                        row['bagged_error'] = row['bagged_effect'] - row['true_effect']
+                        row['bagged_abs_error'] = abs(row['bagged_error'])
+                        row['bagged_squared_error'] = row['bagged_error'] ** 2
+                    
+                    # Calculate bootstrap errors
+                    if 'bootstrap_mean' in row and row['bootstrap_mean'] is not None:
+                        row['bootstrap_error'] = row['bootstrap_mean'] - row['true_effect']
+                        row['bootstrap_abs_error'] = abs(row['bootstrap_error'])
+                        row['bootstrap_squared_error'] = row['bootstrap_error'] ** 2
+                    
+                    # Check if bootstrap CI covers true value
+                    if ('bootstrap_ci_lower' in row and 'bootstrap_ci_upper' in row and
+                        row['bootstrap_ci_lower'] is not None and row['bootstrap_ci_upper'] is not None):
+                        row['bootstrap_ci_covers_true'] = (row['true_effect'] >= row['bootstrap_ci_lower'] and 
+                                                         row['true_effect'] <= row['bootstrap_ci_upper'])
+                    
+                    # Check if linreg CIs cover true value
+                    for method in ['true_graph', 'pcmci', 'bagged']:
+                        if (f'{method}_linreg_ci_lower' in row and f'{method}_linreg_ci_upper' in row and
+                            row[f'{method}_linreg_ci_lower'] is not None and row[f'{method}_linreg_ci_upper'] is not None):
+                            row[f'{method}_linreg_ci_covers_true'] = (row['true_effect'] >= row[f'{method}_linreg_ci_lower'] and 
+                                                                    row['true_effect'] <= row[f'{method}_linreg_ci_upper'])
+                
+                # Add row to collection
+                all_rows.append(row)
+    
+    # Create DataFrame from all rows
+    results_df = pd.DataFrame(all_rows)
+    
+    # Save to CSV if output folder is provided
+    if output_folder:
+        os.makedirs(output_folder, exist_ok=True)
+        timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        csv_path = os.path.join(output_folder, f"study_results_{timestamp}.csv")
+        
+        # Create a version of the DataFrame without complex list columns for CSV export
+        export_df = results_df.copy()
+        list_columns = [col for col in export_df.columns if 
+                        isinstance(export_df[col].iloc[0] if len(export_df) > 0 and not export_df[col].isnull().all() else None, list)]
+        
+        for col in list_columns:
+            export_df[f'{col}_count'] = export_df[col].apply(lambda x: len(x) if isinstance(x, list) else 0)
+            export_df.drop(col, axis=1, inplace=True)
+        
+        export_df.to_csv(csv_path, index=False)
+        print(f"Results saved to {csv_path}")
+        
+        # Save full DataFrame with all columns as pickle for later use
+        pickle_path = os.path.join(output_folder, f"study_results_{timestamp}.pkl")
+        results_df.to_pickle(pickle_path)
+        print(f"Full results (including list columns) saved to {pickle_path}")
+    
+    print(f"Loaded {len(results_df)} data points")
+    
+    return results_df
         
 # Example usage
 if __name__ == "__main__":

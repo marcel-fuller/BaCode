@@ -64,10 +64,10 @@ def plot_causal_graph(graph, val_matrix=None, var_names=None, save_path=None, ti
     )
     
     # Set title
-    if title:
-        plt.title(title, fontsize=14)
+    #if title:
+        #plt.title(title, fontsize=14)
     
-    plt.tight_layout()
+    #plt.tight_layout()
     
     # Save if path is provided
     if save_path:
@@ -116,10 +116,10 @@ def plot_ts_graph(graph, val_matrix=None, var_names=None, save_path=None, title=
     )
     
     # Set title
-    if title:
-        plt.title(title, fontsize=14)
+    #if title:
+        #plt.title(title, fontsize=14)
     
-    plt.tight_layout()
+    #plt.tight_layout()
     
     # Save if path is provided
     if save_path:
@@ -127,7 +127,6 @@ def plot_ts_graph(graph, val_matrix=None, var_names=None, save_path=None, title=
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
     
     return fig_ax
-
 
 def plot_graph_comparison(graphs_dict, var_names=None, save_path=None):
     """
@@ -200,7 +199,7 @@ def plot_graph_comparison(graphs_dict, var_names=None, save_path=None):
         row, col = i // cols, i % cols
         axes[row, col].set_visible(False)
     
-    plt.tight_layout()
+    #plt.tight_layout()
     
     # Save if path is provided
     if save_path:
@@ -268,7 +267,7 @@ def plot_effect_histogram(bootstrap_effects, true_effect=None, save_path=None):
     ax.set_title('Distribution of Bootstrap Effect Estimates')
     ax.legend()
     
-    plt.tight_layout()
+    #plt.tight_layout()
     
     # Save if path is provided
     if save_path:
@@ -346,7 +345,7 @@ def plot_effect_density(bootstrap_effects, true_effect=None, save_path=None):
     ax.set_title('Density of Bootstrap Effect Estimates')
     ax.legend()
     
-    plt.tight_layout()
+    #plt.tight_layout()
     
     # Save if path is provided
     if save_path:
@@ -423,7 +422,7 @@ def plot_multimodality_test(bootstrap_effects, save_path=None):
     ax.set_xlabel('Effect Size')
     ax.set_ylabel('Density')
     
-    plt.tight_layout()
+    #plt.tight_layout()
     
     # Save if path is provided
     if save_path:
@@ -547,7 +546,7 @@ def plot_effect_comparison(results_df, param_name=None, effect_key=None,
     
     ax.legend(title='Method')
     
-    plt.tight_layout()
+    #plt.tight_layout()
     
     # Save if path is provided
     if save_path:
@@ -675,7 +674,7 @@ def plot_error_comparison(results_df, param_name=None, effect_key=None,
     
     ax.legend(title='Method')
     
-    plt.tight_layout()
+    #plt.tight_layout()
     
     # Save if path is provided
     if save_path:
@@ -777,7 +776,7 @@ def plot_metrics_comparison(results_df, param_name=None, metric='mae',
     
     ax.legend(title='Method')
     
-    plt.tight_layout()
+    #plt.tight_layout()
     
     # Save if path is provided
     if save_path:
@@ -1574,7 +1573,7 @@ def plot_timing_breakdown(results_df, param_name=None, param_value=None, save_pa
     # Rotate x-axis labels for better readability
     plt.xticks(rotation=45, ha='right')
     
-    plt.tight_layout()
+    #plt.tight_layout()
     
     # Save if path is provided
     if save_path:
@@ -1893,7 +1892,7 @@ def plot_bootstrap_distribution_with_methods(bootstrap_effects, true_effect=None
     
     plt.xlabel('Effect Size')
     plt.ylabel('Density')
-    plt.title(title if title else 'Bootstrap Effect Distribution with Method Comparison')
+    #plt.title(title if title else 'Bootstrap Effect Distribution with Method Comparison')
     plt.legend()
     plt.grid(True)
     
@@ -2068,9 +2067,9 @@ def plot_ci_width_comparison(df, param_name=None, effect_key=None, save_path=Non
         title += f' for {effect_key}'
     if param_name:
         title += f' by {param_name}'
-    plt.title(title)
+    #plt.title(title)
     plt.grid(True, alpha=0.3)
-    plt.tight_layout()
+    #plt.tight_layout()
     
     if save_path:
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
@@ -2210,9 +2209,9 @@ def plot_ci_width_to_error_ratio(df, param_name=None, effect_key=None, save_path
         title += f' for {effect_key}'
     if param_name:
         title += f' by {param_name}'
-    plt.title(title)
+    #plt.title(title)
     plt.grid(True, alpha=0.3)
-    plt.tight_layout()
+    #plt.tight_layout()
     
     if save_path:
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
@@ -2542,9 +2541,9 @@ def plot_ci_success_rate(df, param_name=None, save_path=None):
     title = 'CI Estimation Success Rate'
     if param_name:
         title += f' by {param_name}'
-    plt.title(title)
+    #plt.title(title)
     plt.grid(True, alpha=0.3)
-    plt.tight_layout()
+    #plt.tight_layout()
     
     if save_path:
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
@@ -2661,7 +2660,7 @@ def plot_ci_distribution_comparison(df, param_value, effect_key=None, save_path=
     # Add grid
     ax.grid(True, alpha=0.3)
     
-    plt.tight_layout()
+    #plt.tight_layout()
     
     if save_path:
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
@@ -2831,7 +2830,7 @@ def plot_adjustment_size_vs_error(analysis_df, method='bagged', param_name=None,
     if plot_df[size_col].nunique() <= 10:
         ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
     
-    plt.tight_layout()
+    #plt.tight_layout()
     
     # Save if path is provided
     if save_path:
@@ -2965,7 +2964,7 @@ def plot_graph_diversity_heatmap(dissimilarity_matrix, save_path=None):
     ax2.set_xlabel('Graph Index')
     ax2.set_ylabel('Distance')
     
-    plt.tight_layout()
+    #plt.tight_layout()
     
     # Save if path is provided
     if save_path:
@@ -3050,7 +3049,7 @@ def plot_adjustment_set_stats(results_df, param_name=None, save_path=None):
     ax.set_ylabel('Adjustment Set Size')
     ax.grid(axis='y', linestyle='--', alpha=0.7)
     
-    plt.tight_layout()
+    #plt.tight_layout()
     
     # Save if path is provided
     if save_path:
@@ -3123,7 +3122,7 @@ def plot_graph_diversity_by_parameter(results_df, param_name, save_path=None):
         ax2.text(0.5, 0.5, "No bootstrap CI data", 
                 ha='center', va='center', fontsize=14)
     
-    plt.tight_layout()
+    #plt.tight_layout()
     
     # Save if path is provided
     if save_path:
@@ -3407,7 +3406,7 @@ def plot_discovery_estimation_ratio_by_T(df, save_path=None):
     ax2.legend(handles=legend_elements, loc='upper left', ncol=2)
     
     # Adjust layout
-    plt.tight_layout()
+    #plt.tight_layout()
     
     # Save if path is provided
     if save_path:
@@ -3459,9 +3458,10 @@ def generate_all_plots(study_folder, results_folder, studies=None):
     # Split by study type
     study_data = {}
     for study in studies:
-        param_name = study.split('_')[0]  # Extract parameter name from study folder
-        study_df = all_results[all_results['param_name'] == param_name]
+        study_df = all_results[all_results['substudy'] == study]
+        
         if len(study_df) > 0:
+            param_name = all_results[all_results['substudy'] == study].iloc[0]['param_name']
             study_data[param_name] = study_df
     
     # Generate plots for each study
@@ -3622,7 +3622,7 @@ def generate_all_plots(study_folder, results_folder, studies=None):
                 
                 plt.xlabel('Parameter Value')
                 plt.ylabel('Mean Absolute Error')
-                plt.title(f'{method.capitalize()} Mean Absolute Error Across Studies')
+                #plt.title(f'{method.capitalize()} Mean Absolute Error Across Studies')
                 plt.legend()
                 plt.grid(True)
                 plt.savefig(os.path.join(results_folder, f"combined_{method}_error.png"), 
@@ -3659,7 +3659,7 @@ def generate_all_plots(study_folder, results_folder, studies=None):
                     plt.axhline(y=95, color='gray', linestyle='--', alpha=0.7, label='95% Target')
                     plt.xlabel('Parameter Value')
                     plt.ylabel('Coverage Rate (%)')
-                    plt.title(f'{method.capitalize()} CI Coverage Across Studies')
+                    #plt.title(f'{method.capitalize()} CI Coverage Across Studies')
                     plt.legend()
                     plt.grid(True)
                     plt.savefig(os.path.join(results_folder, f"combined_{method}_coverage.png"), 

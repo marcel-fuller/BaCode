@@ -404,6 +404,7 @@ def run_bootstrap_pcmci(pcmci, pc_alpha=0.05, tau_max=5, n_boot=100, boot_blockl
     
     # Create bagged graph
     bagged_graph = results['summary_results']['most_frequent_links']
+    bagged_val_matrix = results['summary_results']['val_matrix_mean']
     
     # Save if path is provided
     if save_path:
@@ -411,10 +412,13 @@ def run_bootstrap_pcmci(pcmci, pc_alpha=0.05, tau_max=5, n_boot=100, boot_blockl
         
         # Save graphs and results
         np.save(f"{save_path}_bagged_graph.npy", bagged_graph)
+        np.save(f"{save_path}_val_matrix.npy", bagged_val_matrix)
         
         # Save boot graphs separately
         boot_graphs = results['boot_results']['graph']
+        boot_val_matrix = results['boot_results']['val_matrix']
         np.save(f"{save_path}_boot_graphs.npy", boot_graphs)
+        np.save(f"{save_path}_val_matrix.npy", boot_val_matrix)
         
         # Save metadata
         metadata = {

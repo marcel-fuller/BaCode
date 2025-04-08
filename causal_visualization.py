@@ -19,6 +19,69 @@ from tigramite.pcmci import PCMCI
 # Set Seaborn style
 sns.set_theme(style="whitegrid")
 
+# =====================================================================
+# Global Settings and Constants
+# =====================================================================
+
+# Standard color palette for consistent visualization
+METHOD_COLORS = {
+    # Truth group
+    'True_effect': '#c62828',  # Deep red for absolute truth
+    'True Effect': '#c62828',  # Deep red for absolute truth
+    'True_graph': '#9c27b0',   # Medium purple for true graph estimate
+    
+    # Methods ladder - complementary colors
+    'Pcmci': '#f57f17',        # Amber for basic method
+    'Bagged': '#00897b',       # Teal for middle method
+    'Bootstrap': '#1565c0',    # Blue for most advanced method
+
+    'PCMCI → Effect': '#f57f17',        # Amber for basic method
+    'Bagged PCMCI → Effect':'#00897b',       # Teal for middle method
+    'Bootstrap PCMCI → Effect': '#1565c0',    # Blue for most advanced method
+}
+
+# Method name mapping for display
+METHOD_LABELS = {
+    'True_graph': 'True Graph',
+    'Pcmci': 'PCMCI',
+    'Bagged': 'Bagged PCMCI',
+    'Bootstrap': 'Bootstrap PCMCI',
+    'True_effect': 'True Effect'
+}
+
+# Standard figure sizes for different types of plots
+FIGURE_SIZES = {
+    'single': (10, 6),      # Single plot
+    'comparison': (12, 7),  # Method comparison
+    'grid': (15, 10),       # Grid of plots
+    'multi_row': (12, 12)   # Multiple rows
+}
+
+# Set default Matplotlib and Seaborn styles
+def set_visualization_style():
+    """Set global visualization style settings."""
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    
+    # Use seaborn style but with larger fonts and elements
+    sns.set_theme(style="whitegrid")
+    
+    # Increase font sizes
+    plt.rcParams.update({
+        'font.size': 12,
+        'axes.titlesize': 14,
+        'axes.labelsize': 12,
+        'xtick.labelsize': 10,
+        'ytick.labelsize': 10,
+        'legend.fontsize': 10,
+        'figure.titlesize': 16
+    })
+    
+    # Use the same color cycle as our METHOD_COLORS
+    plt.rcParams['axes.prop_cycle'] = plt.cycler(color=list(METHOD_COLORS.values()))
+    
+    return
+
 
 # =====================================================================
 # Graph Visualization
@@ -192,7 +255,7 @@ def plot_graph_comparison(graphs_dict, var_names=None, save_path=None):
             fig_ax=(fig,ax)
         )
         
-        ax.set_title(name, fontsize=12)
+        #ax.set_title(name, fontsize=12)
     
     # Hide empty subplots
     for i in range(n_graphs, rows * cols):
@@ -212,6 +275,184 @@ def plot_graph_comparison(graphs_dict, var_names=None, save_path=None):
 # =====================================================================
 # Effect Visualization
 # =====================================================================
+
+def plot_estimation_success_rate(df, param_name=None, save_path=None):
+    """
+    Plot the success rate of effect estimations (non-NaN) for different methods.
+    
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame with estimation results
+    param_name : str, optional
+        Parameter name for x-axis. If None, will show overall success rates.
+    save_path : str, optional
+        Path to save the plot
+        
+    Returns
+    -------
+    matplotlib.figure.Figure
+        The created figure
+    """
+    
+    # Create figure
+    fig, ax = plt.subplots(figsize=(12, 6))
+    
+    # Define methods to analyze
+    methods = ['true_graph', 'pcmci', 'bagged', 'bootstrap']
+    
+    # Filter data if needed
+    plot_df = df.copy()
+    if param_name is not None:
+        plot_df = plot_df[plot_df['param_name'] == param_name]
+    
+    if len(plot_df) == 0:
+        ax.text(0.5, 0.5, "No data available for the selected parameter", 
+                ha='center', va='center', fontsize=14)
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        return fig
+    
+    # Prepare data for plotting
+    if param_name is not None:
+        # Group by parameter value
+        param_values = sorted(plot_df['param_value'].unique())
+        
+        # Calculate success rates for each method and parameter value
+        success_data = []
+        
+        for param_val in param_values:
+            subset = plot_df[plot_df['param_value'] == param_val]
+            
+            for method in methods:
+                # Define column to check
+                if method == 'bootstrap':
+                    effect_col = 'bootstrap_mean'
+                else:
+                    effect_col = f'{method}_effect'
+                
+                # Calculate success rate (non-NaN ratio)
+                if effect_col in subset.columns:
+                    total = len(subset)
+                    
+                    if method == 'bootstrap' and 'bootstrap_success_rate' in subset.columns:
+                        # Handle bootstrap method - use the provided success_rate column
+                        if len(subset) == 1:
+                            # If only one row, directly extract the value
+                            success_rate = subset['bootstrap_success_rate'].iloc[0]
+                            successful = int(success_rate * total) if not pd.isna(success_rate) else 0
+                        else:
+                            # If multiple rows, take the mean
+                            success_rate = subset['bootstrap_success_rate'].mean()
+                            successful = int(success_rate * total) if not pd.isna(success_rate) else 0
+                    else:
+                        # For other methods, calculate based on non-NaN values
+                        successful = subset[effect_col].notna().sum()
+                        success_rate = successful / total if total > 0 else 0
+                        
+                    success_data.append({
+                        'param_value': param_val,
+                        'method': method.capitalize(),
+                        'success_rate': success_rate,
+                        'successful': successful,
+                        'total': total
+                    })
+
+        # Convert to DataFrame
+        success_df = pd.DataFrame(success_data)
+        
+        if len(success_df) == 0:
+            ax.text(0.5, 0.5, "No estimation data available", 
+                    ha='center', va='center', fontsize=14)
+            if save_path:
+                plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            return fig
+        
+        # Create line plot
+        sns.lineplot(
+            data=success_df,
+            x='param_value',
+            y='success_rate',
+            hue='method',
+            marker='o',
+            palette=METHOD_COLORS,
+            ax=ax
+        )       
+        
+        ax.set_xlabel(f'{param_name.capitalize()} Value')
+        
+    else:
+        # Calculate overall success rates
+        success_data = []
+        
+        for method in methods:
+            if method == 'bootstrap':
+                effect_col = 'bootstrap_mean'
+            else:
+                effect_col = f'{method}_effect'
+            
+            if effect_col in plot_df.columns:
+                total = len(plot_df)
+                
+                # For other methods, calculate based on non-NaN values
+                successful = plot_df[effect_col].notna().sum()
+                success_rate = successful / total if total > 0 else 0
+                
+                success_data.append({
+                    'method': method.capitalize(),
+                    'success_rate': success_rate,
+                    'successful': successful,
+                    'total': total
+                })
+        
+        # Convert to DataFrame
+        success_df = pd.DataFrame(success_data)
+        
+        if len(success_df) == 0:
+            ax.text(0.5, 0.5, "No estimation data available", 
+                    ha='center', va='center', fontsize=14)
+            if save_path:
+                plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            return fig
+        
+        # Create bar plot
+        bars = ax.bar(
+            success_df['method'],
+            success_df['success_rate'],
+            color = [METHOD_COLORS[method] for method in success_df['method']]
+        )
+        
+        # Add data labels
+        for bar, successful, total in zip(bars, success_df['successful'], success_df['total']):
+            height = bar.get_height()
+            ax.text(
+                bar.get_x() + bar.get_width()/2.,
+                height + 0.02,
+                f"{int(successful)}/{int(total)}\n({height:.1%})",
+                ha='center',
+                va='bottom'
+            )
+        
+        ax.set_xlabel('Method')
+    
+    # Common formatting
+    ax.set_ylabel('Success Rate')
+    ax.set_ylim(0, 1.05)
+    
+    title = 'Effect Estimation Success Rate'
+    if param_name:
+        title += f' by {param_name.capitalize()}'
+    #ax.set_title(title)
+    
+    ax.grid(True, alpha=0.3)
+    ax.legend()
+    
+    # Save if path is provided
+    if save_path:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    
+    return fig
 
 def plot_effect_histogram(bootstrap_effects, true_effect=None, save_path=None):
     """
@@ -264,7 +505,7 @@ def plot_effect_histogram(bootstrap_effects, true_effect=None, save_path=None):
     # Add labels and title
     ax.set_xlabel('Effect Size')
     ax.set_ylabel('Frequency')
-    ax.set_title('Distribution of Bootstrap Effect Estimates')
+    #ax.set_title('Distribution of Bootstrap Effect Estimates')
     ax.legend()
     
     #plt.tight_layout()
@@ -342,7 +583,7 @@ def plot_effect_density(bootstrap_effects, true_effect=None, save_path=None):
     # Add labels and title
     ax.set_xlabel('Effect Size')
     ax.set_ylabel('Density')
-    ax.set_title('Density of Bootstrap Effect Estimates')
+    #ax.set_title('Density of Bootstrap Effect Estimates')
     ax.legend()
     
     #plt.tight_layout()
@@ -408,15 +649,15 @@ def plot_multimodality_test(bootstrap_effects, save_path=None):
         is_multimodal = len(peaks) > 1
         
         # Add label for multimodality
-        if is_multimodal:
-            ax.set_title('Multimodal Distribution Detected')
-        else:
-            ax.set_title('No Multimodality Detected')
+        #if is_multimodal:
+            #ax.set_title('Multimodal Distribution Detected')
+        #else:
+            #ax.set_title('No Multimodality Detected')
     except:
         # Fall back to histogram if KDE fails
         sns.histplot(effects, kde=True, ax=ax)
         is_multimodal = False
-        ax.set_title('Multimodality Test Failed - Using Histogram')
+        #ax.set_title('Multimodality Test Failed - Using Histogram')
     
     # Add labels
     ax.set_xlabel('Effect Size')
@@ -473,7 +714,7 @@ def plot_effect_comparison(results_df, param_name=None, effect_key=None,
         return fig
     
     # Create figure
-    fig, ax = plt.subplots(figsize=(12, 6))
+    fig, ax = plt.subplots(figsize=FIGURE_SIZES['comparison'])
     
     # Set x variable based on param_name
     if param_name is not None:
@@ -521,12 +762,12 @@ def plot_effect_comparison(results_df, param_name=None, effect_key=None,
     # Create the plot
     if x_var == 'effect_key':
         # Categorical plot
-        sns.barplot(data=melt_df, x=x_var, y='Effect', hue='Method', ax=ax)
+        sns.barplot(data=melt_df, x=x_var, y='Effect', hue='Method', ax=ax,palette=METHOD_COLORS)
         plt.xticks(rotation=45)
     else:
         # Line plot for parameter study
         sns.lineplot(data=melt_df, x=x_var, y='Effect', hue='Method', 
-                    marker='o', ax=ax)
+                    marker='o', ax=ax,palette=METHOD_COLORS)
     
     # Add confidence intervals for bootstrap if available
     if 'bootstrap_mean' in plot_cols and param_name is not None:
@@ -539,10 +780,10 @@ def plot_effect_comparison(results_df, param_name=None, effect_key=None,
     # Add labels and title
     ax.set_xlabel(x_label)
     ax.set_ylabel('Effect Size')
-    if effect_key is not None:
-        ax.set_title(f'Effect Comparison for {effect_key}')
-    else:
-        ax.set_title('Effect Comparison Across Methods')
+    #if effect_key is not None:
+        #ax.set_title(f'Effect Comparison for {effect_key}')
+    #else:
+        #ax.set_title('Effect Comparison Across Methods')
     
     ax.legend(title='Method')
     
@@ -618,7 +859,7 @@ def plot_error_comparison(results_df, param_name=None, effect_key=None,
         return fig
     
     # Create figure
-    fig, ax = plt.subplots(figsize=(12, 6))
+    fig, ax = plt.subplots(figsize=FIGURE_SIZES['comparison'])
     
     # Set x variable based on param_name
     if param_name is not None:
@@ -657,20 +898,20 @@ def plot_error_comparison(results_df, param_name=None, effect_key=None,
     # Create the plot
     if x_var == 'effect_key':
         # Categorical plot
-        sns.barplot(data=melt_df, x=x_var, y=error_label, hue='Method', ax=ax)
+        sns.barplot(data=melt_df, x=x_var, y=error_label, hue='Method', ax=ax,palette=METHOD_COLORS)
         plt.xticks(rotation=45)
     else:
         # Line plot for parameter study
         sns.lineplot(data=melt_df, x=x_var, y=error_label, hue='Method', 
-                    marker='o', ax=ax)
+                    marker='o', ax=ax,palette=METHOD_COLORS)
     
     # Add labels and title
     ax.set_xlabel(x_label)
     ax.set_ylabel(error_label)
-    if effect_key is not None:
-        ax.set_title(f'{error_label} Comparison for {effect_key}')
-    else:
-        ax.set_title(f'{error_label} Comparison Across Methods')
+    #if effect_key is not None:
+        #ax.set_title(f'{error_label} Comparison for {effect_key}')
+    #else:
+        #ax.set_title(f'{error_label} Comparison Across Methods')
     
     ax.legend(title='Method')
     
@@ -730,7 +971,7 @@ def plot_metrics_comparison(results_df, param_name=None, metric='mae',
         x_label = 'Configuration'
     
     # Create figure
-    fig, ax = plt.subplots(figsize=(12, 6))
+    fig, ax = plt.subplots(figsize=FIGURE_SIZES['comparison'])
     
     # Create a melted DataFrame for plotting
     plot_cols = []
@@ -759,11 +1000,11 @@ def plot_metrics_comparison(results_df, param_name=None, metric='mae',
     # Create the plot
     if isinstance(x_var, pd.Index):
         # Categorical plot
-        sns.barplot(data=melt_df, x=melt_df.index, y=metric.upper(), hue='Method', ax=ax)
+        sns.barplot(data=melt_df, x=melt_df.index, y=metric.upper(), hue='Method', ax=ax,palette=METHOD_COLORS)
     else:
         # Line plot
         sns.lineplot(data=melt_df, x=x_var, y=metric.upper(), hue='Method', 
-                    marker='o', ax=ax)
+                    marker='o', ax=ax,palette=METHOD_COLORS)
     
     # Add labels and title
     ax.set_xlabel(x_label)
@@ -772,7 +1013,7 @@ def plot_metrics_comparison(results_df, param_name=None, metric='mae',
                     'bias': 'Bias (Mean Error)'}
     y_label = metric_labels.get(metric, metric.upper())
     ax.set_ylabel(y_label)
-    ax.set_title(f'{y_label} Comparison Across Methods')
+    #ax.set_title(f'{y_label} Comparison Across Methods')
     
     ax.legend(title='Method')
     
@@ -932,7 +1173,7 @@ def plot_linreg_ci_coverage(df, param_name=None, save_path=None):
             ax.legend(handles[:len(methods)], new_labels, title="Method")
     
     # Add title and y-label
-    ax.set_title(f'Linear Regression CI Coverage by {"Method" if not param_name else param_name.capitalize()}')
+    #ax.set_title(f'Linear Regression CI Coverage by {"Method" if not param_name else param_name.capitalize()}')
     ax.set_ylabel('Coverage Rate (%)')
     
     # Add reference to the plot
@@ -954,7 +1195,7 @@ def plot_linreg_ci_coverage(df, param_name=None, save_path=None):
     return fig
 
 # =====================================================================
-# Timing Visualization
+# CI Visualization
 # =====================================================================
 
 
@@ -1086,7 +1327,7 @@ def analyze_linreg_ci_properties(df, param_name=None, save_path=None):
                 ha='center', va='bottom'
             )
     
-    ax1.set_title('Average Linear Regression CI Width')
+    #ax1.set_title('Average Linear Regression CI Width')
     ax1.grid(True, linestyle='--', alpha=0.7)
     
     #---------------------------------------
@@ -1442,7 +1683,7 @@ def plot_error_vs_ci_width(df, param_name=None, save_path=None):
                 # Set axis labels
                 ax.set_xlabel('Confidence Interval Width')
                 ax.set_ylabel('Absolute Error')
-                ax.set_title(f'{label}')
+                #ax.set_title(f'{label}')
                 
                 # Make axes start at 0
                 ax.set_xlim(0, None)
@@ -1556,7 +1797,7 @@ def plot_timing_breakdown(results_df, param_name=None, param_value=None, save_pa
     # Pie chart
     ax1.pie(times, labels=operations, autopct='%1.1f%%', startangle=90)
     ax1.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle
-    ax1.set_title('Proportion of Execution Time by Operation')
+    #ax1.set_title('Proportion of Execution Time by Operation')
     
     # Bar chart
     colors = plt.cm.tab10(np.arange(len(operations)) % 10)
@@ -1654,7 +1895,7 @@ def plot_pipeline_timing_by_T(df, save_path=None):
     
     # Create plot with log scale
     sns.lineplot(data=melted_df, x='T', y='Time (seconds)', hue='Pipeline', 
-                marker='o', ax=ax)
+                marker='o', ax=ax, palette = METHOD_COLORS)
     
     # Set log scale for better visualization
     ax.set_yscale('log')
@@ -1662,10 +1903,10 @@ def plot_pipeline_timing_by_T(df, save_path=None):
     # Add labels and title
     ax.set_xlabel('Time Series Length (T)')
     ax.set_ylabel('Computation Time (seconds, log scale)')
-    ax.set_title('Pipeline Computation Time by Time Series Length')
+    #ax.set_title('Pipeline Computation Time by Time Series Length')
     
     # Improve x-axis
-    ax.set_xticks(T_values)
+    #ax.set_xticks(T_values)
     ax.grid(True, alpha=0.3)
     
     # Add legend
@@ -1766,7 +2007,7 @@ def plot_bootstrap_timing_by_n_boot(df, save_path=None):
     # Add labels and title
     ax.set_xlabel('Number of Bootstrap Samples (n_boot)')
     ax.set_ylabel('Computation Time (seconds)')
-    ax.set_title('Bootstrap-Based Methods Computation Time by Number of Bootstrap Samples')
+    #ax.set_title('Bootstrap-Based Methods Computation Time by Number of Bootstrap Samples')
     
     # Improve x-axis
     ax.set_xticks(n_boot_values)
@@ -1779,6 +2020,348 @@ def plot_bootstrap_timing_by_n_boot(df, save_path=None):
     ax.text(0.05, 0.95, "Note: Dashed lines show linear trends", 
            transform=ax.transAxes, fontsize=10, verticalalignment='top',
            bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+    
+    # Save if path is provided
+    if save_path:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    
+    return fig
+
+def plot_improved_timing_analysis(df, save_path=None):
+    """
+    Plot improved timing analysis comparing discovery and estimation times
+    across different methods based on time series length T.
+    
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame containing study results with timing information
+    save_path : str, optional
+        Path to save the plot
+        
+    Returns
+    -------
+    matplotlib.figure.Figure
+        The generated figure
+    """
+
+    # Filter data for T study
+    T_df = df[df['param_name'] == 'T'].copy()
+    
+    if len(T_df) == 0:
+        fig, ax = plt.subplots(figsize=(10, 6))
+        ax.text(0.5, 0.5, "No data for T parameter study", 
+                ha='center', va='center', fontsize=14)
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        return fig
+    
+    # Sort by T value
+    T_values = sorted(T_df['param_value'].unique())
+    
+    # Calculate discovery and estimation times for each method
+    timing_data = []
+    
+    for T_val in T_values:
+        subset = T_df[T_df['param_value'] == T_val]
+        
+        # PCMCI method
+        pcmci_discovery_time = subset['discovery_pcmci_time'].mean()
+        pcmci_estimation_time = subset['effect_pcmci_effect_time'].mean()
+        pcmci_ratio = pcmci_estimation_time / pcmci_discovery_time if pcmci_discovery_time > 0 else np.nan
+        
+        # Bagged PCMCI method
+        bagged_discovery_time = subset['discovery_pcmci_time'].mean() + subset['discovery_bootstrap_time'].mean()
+        bagged_estimation_time = subset['effect_bagged_effect_time'].mean()
+        bagged_ratio = bagged_estimation_time / bagged_discovery_time if bagged_discovery_time > 0 else np.nan
+        
+        # Bootstrap PCMCI method
+        bootstrap_discovery_time = subset['discovery_pcmci_time'].mean() + subset['discovery_bootstrap_time'].mean()
+        bootstrap_estimation_time = subset['effect_bootstrap_effects_time'].mean()
+        bootstrap_ratio = bootstrap_estimation_time / bootstrap_discovery_time if bootstrap_discovery_time > 0 else np.nan
+        
+        timing_data.append({
+            'T': T_val,
+            'PCMCI Ratio': pcmci_ratio,
+            'Bagged PCMCI Ratio': bagged_ratio,
+            'Bootstrap PCMCI Ratio': bootstrap_ratio,
+            'PCMCI Discovery': pcmci_discovery_time,
+            'PCMCI Estimation': pcmci_estimation_time,
+            'Bagged Discovery': bagged_discovery_time,
+            'Bagged Estimation': bagged_estimation_time,
+            'Bootstrap Discovery': bootstrap_discovery_time,
+            'Bootstrap Estimation': bootstrap_estimation_time
+        })
+    
+    # Convert to DataFrame for plotting
+    plot_df = pd.DataFrame(timing_data)
+    
+    # Create figure with three subplots
+    #fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 15), gridspec_kw={'height_ratios': [1.2, 0.9, 0.9]})
+    fig,ax1 = plt.subplots(figsize=(10, 6))
+
+    # PLOT 1: Ratio of estimation to discovery time (INVERTED from original)
+    ratio_melted = pd.melt(plot_df, id_vars=['T'], 
+                          value_vars=['PCMCI Ratio', 'Bagged PCMCI Ratio', 'Bootstrap PCMCI Ratio'],
+                          var_name='Method', value_name='Estimation/Discovery Ratio')
+    
+    # Create ratio plot with log scale
+    sns.lineplot(data=ratio_melted, x='T', y='Estimation/Discovery Ratio', hue='Method', 
+                marker='o', ax=ax1)
+    
+    # Set log scale for y-axis to handle wide range of values
+    ax1.set_yscale('log')
+    
+    # Add horizontal line at ratio=1 (equal time)
+    ax1.axhline(y=1, color='gray', linestyle='--', alpha=0.7)
+    
+    # Add labels and grid
+    ax1.set_xlabel('Time Series Length (T)')
+    ax1.set_ylabel('Estimation/Discovery Time Ratio (log scale)')
+    ax1.set_title('Ratio of Estimation Time to Discovery Time')
+    ax1.set_xticks(T_values)
+    ax1.set_xticklabels(T_values, rotation=45)
+    ax1.grid(True, alpha=0.3)
+    
+    # Add legend and annotation
+    ax1.legend(title='Method')
+    ax1.text(T_values[-1], 1.1, "Equal Time", ha='right', va='bottom', 
+             color='gray', fontsize=9, fontstyle='italic')
+    
+    if False:
+    # PLOT 2: Discovery times (grouped bar chart)
+        discovery_data = pd.DataFrame({
+            'T': plot_df['T'],
+            'PCMCI': plot_df['PCMCI Discovery'],
+            'Bagged PCMCI': plot_df['Bagged Discovery'],
+            'Bootstrap PCMCI': plot_df['Bootstrap Discovery']
+        })
+        
+        discovery_melted = pd.melt(discovery_data, id_vars=['T'], 
+                                var_name='Method', value_name='Time (seconds)')
+        
+        # Create grouped bar chart for discovery times
+        sns.barplot(data=discovery_melted, x='T', y='Time (seconds)', hue='Method', ax=ax2)
+        
+        # Add labels
+        ax2.set_xlabel('Time Series Length (T)')
+        ax2.set_ylabel('Time (seconds)')
+        ax2.set_title('Discovery Stage Computation Time')
+        ax2.set_xticks(range(len(T_values)))
+        ax2.set_xticklabels(T_values, rotation=45)
+        
+        # Adjust legend position
+        ax2.legend(title='Method', loc='upper left')
+        
+        # PLOT 3: Estimation times (grouped bar chart)
+        estimation_data = pd.DataFrame({
+            'T': plot_df['T'],
+            'PCMCI': plot_df['PCMCI Estimation'],
+            'Bagged PCMCI': plot_df['Bagged Estimation'],
+            'Bootstrap PCMCI': plot_df['Bootstrap Estimation']
+        })
+        
+        estimation_melted = pd.melt(estimation_data, id_vars=['T'], 
+                                var_name='Method', value_name='Time (seconds)')
+        
+        # Create grouped bar chart for estimation times
+        sns.barplot(data=estimation_melted, x='T', y='Time (seconds)', hue='Method', ax=ax3)
+        
+        # Add labels
+        ax3.set_xlabel('Time Series Length (T)')
+        ax3.set_ylabel('Time (seconds)')
+        ax3.set_title('Effect Estimation Stage Computation Time')
+        ax3.set_xticks(range(len(T_values)))
+        ax3.set_xticklabels(T_values, rotation=45)
+        
+        # Adjust legend position
+        ax3.legend(title='Method', loc='upper left')
+    
+    # Adjust layout
+    plt.tight_layout()
+    
+    # Save if path is provided
+    if save_path:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    
+    return fig
+
+
+def plot_compact_timing_analysis(df, save_path=None):
+    """
+    Create a more compact version of the timing analysis with just two plots:
+    1. Ratio plot (estimation/discovery)
+    2. Absolute times for both stages on the same plot with grouped bars
+    
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame containing study results with timing information
+    save_path : str, optional
+        Path to save the plot
+        
+    Returns
+    -------
+    matplotlib.figure.Figure
+        The generated figure
+    """
+    
+    # Filter data for T study
+    T_df = df[df['param_name'] == 'T'].copy()
+    
+    if len(T_df) == 0:
+        fig, ax = plt.subplots(figsize=(10, 6))
+        ax.text(0.5, 0.5, "No data for T parameter study", 
+                ha='center', va='center', fontsize=14)
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        return fig
+    
+    # Sort by T value
+    T_values = sorted(T_df['param_value'].unique())
+    
+    # Calculate discovery and estimation times for each method
+    timing_data = []
+    
+    for T_val in T_values:
+        subset = T_df[T_df['param_value'] == T_val]
+        
+        # PCMCI method
+        pcmci_discovery_time = subset['discovery_pcmci_time'].mean()
+        pcmci_estimation_time = subset['effect_pcmci_effect_time'].mean()
+        pcmci_ratio = pcmci_estimation_time / pcmci_discovery_time if pcmci_discovery_time > 0 else np.nan
+        
+        # Bagged PCMCI method
+        bagged_discovery_time = subset['discovery_pcmci_time'].mean() + subset['discovery_bootstrap_time'].mean()
+        bagged_estimation_time = subset['effect_bagged_effect_time'].mean()
+        bagged_ratio = bagged_estimation_time / bagged_discovery_time if bagged_discovery_time > 0 else np.nan
+        
+        # Bootstrap PCMCI method
+        bootstrap_discovery_time = subset['discovery_pcmci_time'].mean() + subset['discovery_bootstrap_time'].mean()
+        bootstrap_estimation_time = subset['effect_bootstrap_effects_time'].mean()
+        bootstrap_ratio = bootstrap_estimation_time / bootstrap_discovery_time if bootstrap_discovery_time > 0 else np.nan
+        
+        timing_data.append({
+            'T': T_val,
+            'PCMCI Ratio': pcmci_ratio,
+            'Bagged PCMCI Ratio': bagged_ratio,
+            'Bootstrap PCMCI Ratio': bootstrap_ratio,
+            'PCMCI Discovery': pcmci_discovery_time,
+            'PCMCI Estimation': pcmci_estimation_time,
+            'Bagged Discovery': bagged_discovery_time,
+            'Bagged Estimation': bagged_estimation_time,
+            'Bootstrap Discovery': bootstrap_discovery_time,
+            'Bootstrap Estimation': bootstrap_estimation_time
+        })
+    
+    # Convert to DataFrame for plotting
+    plot_df = pd.DataFrame(timing_data)
+    
+    # Create figure with two subplots
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10), gridspec_kw={'height_ratios': [1.2, 1]})
+    
+    # PLOT 1: Ratio of estimation to discovery time (INVERTED from original)
+    ratio_melted = pd.melt(plot_df, id_vars=['T'], 
+                          value_vars=['PCMCI Ratio', 'Bagged PCMCI Ratio', 'Bootstrap PCMCI Ratio'],
+                          var_name='Method', value_name='Estimation/Discovery Ratio')
+    
+    # Create ratio plot with log scale
+    sns.lineplot(data=ratio_melted, x='T', y='Estimation/Discovery Ratio', hue='Method', 
+                marker='o', ax=ax1)
+    
+    # Set log scale for y-axis to handle wide range of values
+    ax1.set_yscale('log')
+    
+    # Add horizontal line at ratio=1 (equal time)
+    ax1.axhline(y=1, color='gray', linestyle='--', alpha=0.7)
+    
+    # Add labels and grid
+    ax1.set_xlabel('Time Series Length (T)')
+    ax1.set_ylabel('Estimation/Discovery Time Ratio (log scale)')
+    ax1.grid(True, alpha=0.3)
+    
+    # Add legend and annotation
+    ax1.legend(title='Method')
+    ax1.text(T_values[-1], 1.1, "Equal Time", ha='right', va='bottom', 
+             color='gray', fontsize=9, fontstyle='italic')
+    
+    # PLOT 2: Absolute times (tidy formatted data for grouped bar chart)
+    # Prepare the data in a format suitable for grouped bars
+    abs_time_data = []
+    
+    # Add discovery times
+    for method, discovery_col in [
+        ('PCMCI', 'PCMCI Discovery'),
+        ('Bagged PCMCI', 'Bagged Discovery'),
+        ('Bootstrap PCMCI', 'Bootstrap Discovery')
+    ]:
+        for idx, row in plot_df.iterrows():
+            abs_time_data.append({
+                'T': row['T'],
+                'Method': method,
+                'Stage': 'Discovery',
+                'Time (seconds)': row[discovery_col]
+            })
+    
+    # Add estimation times
+    for method, estimation_col in [
+        ('PCMCI', 'PCMCI Estimation'),
+        ('Bagged PCMCI', 'Bagged Estimation'),
+        ('Bootstrap PCMCI', 'Bootstrap Estimation')
+    ]:
+        for idx, row in plot_df.iterrows():
+            abs_time_data.append({
+                'T': row['T'],
+                'Method': method,
+                'Stage': 'Estimation',
+                'Time (seconds)': row[estimation_col]
+            })
+    
+    abs_time_df = pd.DataFrame(abs_time_data)
+    
+    # Create grouped bar chart for absolute times
+    g = sns.catplot(
+        data=abs_time_df, 
+        x='T', 
+        y='Time (seconds)',
+        hue='Method', 
+        col='Stage',
+        kind='bar',
+        height=4,
+        aspect=1.5,
+        ax=ax2,
+        sharey=True
+    )
+    
+    # If catplot creates its own figure, we need to extract those axes and copy to our main figure
+    if hasattr(g, 'axes'):
+        # Copy the discovery plot to ax2
+        for child in g.axes[0, 0].get_children():
+            ax2.add_artist(child.copy())
+        
+        # Create a third axis for estimation plot
+        ax3 = fig.add_subplot(3, 1, 3)
+        for child in g.axes[0, 1].get_children():
+            ax3.add_artist(child.copy())
+        
+        # Set titles and labels
+        ax2.set_title('Discovery Time')
+        ax3.set_title('Estimation Time')
+        
+        # Close the catplot figure to avoid displaying it
+        plt.close(g.fig)
+    else:
+        # Set title for the combined plot
+        ax2.set_title('Computation Time by Stage and Method')
+    
+    # Add labels
+    ax2.set_xlabel('Time Series Length (T)')
+    ax2.set_ylabel('Time (seconds)')
+    
+    # Adjust layout
+    plt.tight_layout()
     
     # Save if path is provided
     if save_path:
@@ -2298,7 +2881,7 @@ def plot_ci_coverage_heatmap(df, param_name=None, save_path=None):
         
         # Add title
         method_name = method.replace('_ci_covers_true', '').replace('_', ' ').title()
-        ax.set_title(f'{method_name} Coverage')
+        #ax.set_title(f'{method_name} Coverage')
         
         # Add colorbar
         plt.colorbar(im, ax=ax)
@@ -2433,7 +3016,7 @@ def plot_bootstrap_ci_scatter(df, param_values=None,  save_path=None,effect_key=
                           linewidth=1.5, label=f'{method.replace("_effect", "")}')
         
         # Add title and labels
-        ax.set_title(f'Bootstrap Estimates with CIs (Param Value = {param_value})')
+        #ax.set_title(f'Bootstrap Estimates with CIs (Param Value = {param_value})')
         ax.set_xlabel('Effect Estimate')
         ax.set_ylabel('Bootstrap Replica')
         ax.legend(loc='upper left', bbox_to_anchor=(1.01, 1))
@@ -2650,7 +3233,7 @@ def plot_ci_distribution_comparison(df, param_value, effect_key=None, save_path=
     if effect_key:
         title += f' for {effect_key}'
     title += f' (Param Value = {param_value})'
-    ax.set_title(title)
+    #ax.set_title(title)
     ax.set_xlabel('Effect Estimate')
     ax.set_ylabel('Density')
     
@@ -2730,7 +3313,7 @@ def plot_adjustment_sets(df, param_name, save_path=None):
     
     ax.set_xlabel(f'{param_name.capitalize()} Value')
     ax.set_ylabel('Adjustment Set Size')
-    ax.set_title(f'Adjustment Set Size Comparison - {param_name.capitalize()}')
+    #ax.set_title(f'Adjustment Set Size Comparison - {param_name.capitalize()}')
     ax.legend()
     ax.grid(True)
     
@@ -2824,7 +3407,7 @@ def plot_adjustment_size_vs_error(analysis_df, method='bagged', param_name=None,
     # Add labels and title
     ax.set_xlabel('Adjustment Set Size')
     ax.set_ylabel('Absolute Error')
-    ax.set_title(f'Adjustment Set Size vs. Error for {method.capitalize()}')
+    #ax.set_title(f'Adjustment Set Size vs. Error for {method.capitalize()}')
     
     # Set integer ticks on x-axis if the range is small
     if plot_df[size_col].nunique() <= 10:
@@ -2952,7 +3535,7 @@ def plot_graph_diversity_heatmap(dissimilarity_matrix, save_path=None):
     # Add labels
     ax1.set_xlabel('Graph Index')
     ax1.set_ylabel('Graph Index')
-    ax1.set_title('Graph Dissimilarity Matrix')
+    #ax1.set_title('Graph Dissimilarity Matrix')
     
     # Compute linkage matrix for hierarchical clustering
     condensed_dissimilarity = squareform(dissimilarity_matrix)
@@ -3023,10 +3606,10 @@ def plot_adjustment_set_stats(results_df, param_name=None, save_path=None):
         
         # Create the plot
         sns.lineplot(data=melt_df, x='param_value', y='Adjustment Set Size', 
-                    hue='Method', marker='o', ax=ax)
+                    hue='Method', marker='o', ax=ax,palette=METHOD_COLORS)
         
         ax.set_xlabel(f'{param_name.capitalize()} Value')
-        ax.set_title(f'Adjustment Set Size by {param_name.capitalize()} Value')
+        #ax.set_title(f'Adjustment Set Size by {param_name.capitalize()} Value')
     else:
         # Calculate mean adjustment set size for each method
         means = {col.replace('_adj_size', ''): analysis_df[col].mean() for col in adj_cols}
@@ -3044,7 +3627,7 @@ def plot_adjustment_set_stats(results_df, param_name=None, save_path=None):
             ax.text(i, v + 0.1, f'{v:.2f}', ha='center')
         
         ax.set_xlabel('Method')
-        ax.set_title('Average Adjustment Set Size by Method')
+        #ax.set_title('Average Adjustment Set Size by Method')
     
     ax.set_ylabel('Adjustment Set Size')
     ax.grid(axis='y', linestyle='--', alpha=0.7)
@@ -3101,7 +3684,7 @@ def plot_graph_diversity_by_parameter(results_df, param_name, save_path=None):
         
         ax1.set_xlabel(f'{param_name.capitalize()} Value')
         ax1.set_ylabel('Number of Unique Graphs')
-        ax1.set_title(f'Graph Diversity vs {param_name.capitalize()}')
+        #ax1.set_title(f'Graph Diversity vs {param_name.capitalize()}')
         ax1.grid(True, linestyle='--', alpha=0.7)
     else:
         ax1.text(0.5, 0.5, "No graph diversity data", 
@@ -3179,7 +3762,7 @@ def plot_timing_comparison(df, param_name, save_path=None):
     
     ax.set_xlabel(f'{param_name.capitalize()} Value')
     ax.set_ylabel('Computation Time (seconds)')
-    ax.set_title(f'Computation Time Comparison - {param_name.capitalize()}')
+    #ax.set_title(f'Computation Time Comparison - {param_name.capitalize()}')
     ax.legend()
     ax.grid(True)
     
@@ -3282,7 +3865,7 @@ def plot_discovery_estimation_ratio_by_T(df, save_path=None):
     # Add labels
     ax1.set_xlabel('Time Series Length (T)')
     ax1.set_ylabel('Discovery/Estimation Time Ratio')
-    ax1.set_title('Ratio of Discovery Time to Estimation Time by Method')
+    #ax1.set_title('Ratio of Discovery Time to Estimation Time by Method')
     
     # Improve x-axis
     ax1.set_xticks(T_values)
@@ -3439,6 +4022,9 @@ def generate_all_plots(study_folder, results_folder, studies=None):
     
     # Create results folder if it doesn't exist
     os.makedirs(results_folder, exist_ok=True)
+
+    # Set the global visualization style
+    set_visualization_style()
     
     # Detect studies if not provided
     if studies is None:
@@ -3466,70 +4052,95 @@ def generate_all_plots(study_folder, results_folder, studies=None):
     
     # Generate plots for each study
     plot_info = {
-        'Pipeline': {}, 'Ratio': {}, 'Replica': {}, 'error': {}, 'error_ci': {}, 
+        'Pipeline': {}, 'Ratio': {}, 'Replica': {},'Stacked': {},'Faceted': {}, 'error': {}, 'error_ci': {}, 
         'bootstrap': {}, 'adjustment': {}, 'bootstrap_linreg_ci': {},
-        'linreg_ci_coverage': {}, 'linreg_ci_analysis': {}, 'error_vs_ci_width': {}
+        'linreg_ci_coverage': {}, 'linreg_ci_analysis': {}, 'error_vs_ci_width': {},
+        'estimation_success': {}  # Add this line
     }
     
     # 1. Timing plots
-    print(f"  Generating timing plots...")
-    timing_path = os.path.join(results_folder, f"Pipeline_timing.png")
-    plot_pipeline_timing_by_T(all_results, save_path=timing_path)
+
+    print(f"Generating timing plots...")
+    # Plot overall pipeline timing
+    timing_path = os.path.join(results_folder, f"Pipeline_timing.pdf")
+    plot_pipeline_timing_by_T(study_data['T'], save_path=timing_path)
     plot_info['Pipeline']['T'] = timing_path
-    
-    timingRatio_path = os.path.join(results_folder, f"Ratio_timing.png")
-    plot_discovery_estimation_ratio_by_T(all_results, save_path=timingRatio_path)
+
+    # Plot improved timing ratio using the new function
+    timingRatio_path = os.path.join(results_folder, f"Ratio_timing.pdf")
+    plot_improved_timing_analysis(study_data['T'], save_path=timingRatio_path)
     plot_info['Ratio']['T'] = timingRatio_path
-    
-    timingBoot_path = os.path.join(results_folder, f"Replica_timing.png")
-    plot_bootstrap_timing_by_n_boot(all_results, save_path=timingBoot_path)
-    plot_info['Replica']['n_boot'] = timing_path
-    
+
+    # Alternative: use compact version if preferred
+    # timingRatio_path = os.path.join(results_folder, f"Ratio_timing.pdf")
+    # plot_compact_timing_analysis(all_results, save_path=timingRatio_path)
+    # plot_info['Ratio']['T'] = timingRatio_path
+
+    # Plot bootstrap timing by number of replicas
+    timingBoot_path = os.path.join(results_folder, f"Replica_timing.pdf")
+    plot_bootstrap_timing_by_n_boot(study_data['B'], save_path=timingBoot_path)
+    plot_info['Replica']['n_boot'] = timingBoot_path
+
+
+   
+
     """
     # 2. Overall CI Coverage Analysis
     print(f"  Generating overall CI coverage analysis...")
-    overall_coverage_path = os.path.join(results_folder, f"overall_linreg_ci_coverage.png")
+    overall_coverage_path = os.path.join(results_folder, f"overall_linreg_ci_coverage.pdf")
     plot_linreg_ci_coverage(all_results, save_path=overall_coverage_path)
     plot_info['linreg_ci_coverage']['overall'] = overall_coverage_path
     
-    overall_ci_analysis_path = os.path.join(results_folder, f"overall_linreg_ci_analysis.png")
+    overall_ci_analysis_path = os.path.join(results_folder, f"overall_linreg_ci_analysis.pdf")
     analyze_linreg_ci_properties(all_results, save_path=overall_ci_analysis_path)
     plot_info['linreg_ci_analysis']['overall'] = overall_ci_analysis_path
     """
+
+    print(f"  Generating overall estimation success rate plot...")
+    overall_success_path = os.path.join(results_folder, f"overall_estimation_success.pdf")
+    plot_estimation_success_rate(all_results, save_path=overall_success_path)
+    plot_info['estimation_success']['overall'] = overall_success_path
+
     
-    overall_error_width_path = os.path.join(results_folder, f"overall_error_vs_ci_width.png")
+    overall_error_width_path = os.path.join(results_folder, f"overall_error_vs_ci_width.pdf")
     plot_error_vs_ci_width(all_results, save_path=overall_error_width_path)
     plot_info['error_vs_ci_width']['overall'] = overall_error_width_path
     
     for param_name, df in study_data.items():
         print(f"Generating plots for {param_name} study...")
         
+        # Parameter-specific success rate
+        print(f"  Generating estimation success rate plot...")
+        success_path = os.path.join(results_folder, f"{param_name}_estimation_success.pdf")
+        plot_estimation_success_rate(df, param_name, save_path=success_path)
+        plot_info['estimation_success'][param_name] = success_path
+
         # 3. Error plots without CI
         print(f"  Generating error plots without CI...")
         # Absolute error
-        abs_error_path = os.path.join(results_folder, f"{param_name}_abs_error.png")
+        abs_error_path = os.path.join(results_folder, f"{param_name}_abs_error.pdf")
         plot_error_comparison(df, param_name, error_type='abs', save_path=abs_error_path)
         # Bias (signed error)
-        bias_path = os.path.join(results_folder, f"{param_name}_bias.png")
+        bias_path = os.path.join(results_folder, f"{param_name}_bias.pdf")
         plot_error_comparison(df, param_name, error_type='raw', save_path=bias_path)
         plot_info['error'][param_name] = {'abs': abs_error_path, 'bias': bias_path}
         
         
         # 4. Effect comparison
         print(f"  Generating effect comparison plots...")
-        effect_path = os.path.join(results_folder, f"{param_name}_effect.png")
+        effect_path = os.path.join(results_folder, f"{param_name}_effect.pdf")
         plot_effect_comparison(df, param_name, save_path=effect_path)
         
         
         # 5. CI Comparison
         print(f"  Generating CI comparison plots...")
-        ci_path = os.path.join(results_folder, f"{param_name}_CIs.png")
+        ci_path = os.path.join(results_folder, f"{param_name}_CIs.pdf")
         plot_ci_width_comparison(df, param_name, save_path=ci_path)
         
-        ci_error_path = os.path.join(results_folder, f"{param_name}_CIvsErrors.png")
+        ci_error_path = os.path.join(results_folder, f"{param_name}_CIvsErrors.pdf")
         plot_ci_width_to_error_ratio(df, param_name, save_path=ci_error_path)
         
-        bs_scatter_path = os.path.join(results_folder, f"{param_name}_bsScatter.png")
+        bs_scatter_path = os.path.join(results_folder, f"{param_name}_bsScatter.pdf")
         plot_bootstrap_ci_scatter(df, param_values=None, save_path=bs_scatter_path)
         
         # 6. Bootstrap distribution with method comparisons for interesting cases
@@ -3543,7 +4154,7 @@ def generate_all_plots(study_folder, results_folder, studies=None):
             row = df[(df['param_name'] == param_name) & (df['param_value'] == param_val)].iloc[0]
             
             if 'bootstrap_effects' in row and sum(not pd.isna(x) for x in row['bootstrap_effects']) >= 2:
-                bs_path = os.path.join(results_folder, f"{param_name}_{param_val}_bootstrap.png")
+                bs_path = os.path.join(results_folder, f"{param_name}_{param_val}_bootstrap.pdf")
                 plot_bootstrap_distribution_with_methods(
                     row['bootstrap_effects'],
                     true_effect=row.get('true_effect'),
@@ -3560,26 +4171,26 @@ def generate_all_plots(study_folder, results_folder, studies=None):
         # 7. Adjustment set plots
         print(f"  Generating adjustment set plots...")
         if any('adjustment_set_size' in col for col in df.columns):
-            adj_path = os.path.join(results_folder, f"{param_name}_adjustment_sets.png")
+            adj_path = os.path.join(results_folder, f"{param_name}_adjustment_sets.pdf")
             plot_adjustment_sets(df, param_name, save_path=adj_path)
             plot_info['adjustment'][param_name] = adj_path
         
         """
         # 8. New: CI coverage by parameter
         print(f"  Generating CI coverage plots...")
-        coverage_path = os.path.join(results_folder, f"{param_name}_linreg_ci_coverage.png")
+        coverage_path = os.path.join(results_folder, f"{param_name}_linreg_ci_coverage.pdf")
         plot_linreg_ci_coverage(df, param_name, save_path=coverage_path)
         plot_info['linreg_ci_coverage'][param_name] = coverage_path
         
         # 9. New: CI properties analysis
         print(f"  Generating CI properties analysis...")
-        ci_analysis_path = os.path.join(results_folder, f"{param_name}_linreg_ci_analysis.png")
+        ci_analysis_path = os.path.join(results_folder, f"{param_name}_linreg_ci_analysis.pdf")
         analyze_linreg_ci_properties(df, param_name, save_path=ci_analysis_path)
         plot_info['linreg_ci_analysis'][param_name] = ci_analysis_path
         
         # 10. New: Error vs CI width
         print(f"  Generating error vs CI width analysis...")
-        error_width_path = os.path.join(results_folder, f"{param_name}_error_vs_ci_width.png")
+        error_width_path = os.path.join(results_folder, f"{param_name}_error_vs_ci_width.pdf")
         plot_error_vs_ci_width(df, param_name, save_path=error_width_path)
         plot_info['error_vs_ci_width'][param_name] = error_width_path
         
@@ -3589,7 +4200,7 @@ def generate_all_plots(study_folder, results_folder, studies=None):
         linreg_ci_paths = {}
         if 'bootstrap_replica_ci_lower' in df.columns:
             for param_val in interesting_values:
-                lr_ci_path = os.path.join(results_folder, f"{param_name}_{param_val}_linreg_ci.png")
+                lr_ci_path = os.path.join(results_folder, f"{param_name}_{param_val}_linreg_ci.pdf")
                 plot_bootstrap_linreg_ci_distribution(df, param_name, param_val, save_path=lr_ci_path)
                 linreg_ci_paths[param_val] = lr_ci_path
             
@@ -3602,7 +4213,7 @@ def generate_all_plots(study_folder, results_folder, studies=None):
     # Combined error comparison across studies
     if len(study_data) > 1:
         # Combine error metrics for all methods
-        for method in ['pcmci', 'bagged', 'bootstrap']:
+        for method in ['true_graph','pcmci', 'bagged', 'bootstrap']:
             error_metrics = []
             for param_name, df in study_data.items():
                 # Group by parameter value and calculate mean error
@@ -3625,7 +4236,7 @@ def generate_all_plots(study_folder, results_folder, studies=None):
                 #plt.title(f'{method.capitalize()} Mean Absolute Error Across Studies')
                 plt.legend()
                 plt.grid(True)
-                plt.savefig(os.path.join(results_folder, f"combined_{method}_error.png"), 
+                plt.savefig(os.path.join(results_folder, f"combined_{method}_error.pdf"), 
                            dpi=300, bbox_inches='tight')
                 plt.close()
                 
@@ -3662,7 +4273,7 @@ def generate_all_plots(study_folder, results_folder, studies=None):
                     #plt.title(f'{method.capitalize()} CI Coverage Across Studies')
                     plt.legend()
                     plt.grid(True)
-                    plt.savefig(os.path.join(results_folder, f"combined_{method}_coverage.png"), 
+                    plt.savefig(os.path.join(results_folder, f"combined_{method}_coverage.pdf"), 
                                dpi=300, bbox_inches='tight')
                     plt.close()
         """

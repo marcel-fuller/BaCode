@@ -1815,6 +1815,12 @@ def load_study_results(study_folder, output_folder=None):
                 
                 # Calculate errors and coverage
                 if 'true_effect' in row and row['true_effect'] is not None:
+
+                    if 'true_graph_effect' in row and row['true_graph_effect'] is not None:
+                        row['true_graph_error'] = row['true_graph_effect'] - row['true_effect']
+                        row['true_graph_abs_error'] = abs(row['true_graph_error'])
+                        row['true_graph_squared_error'] = row['true_graph_error'] ** 2
+
                     # Calculate PCMCI errors
                     if 'pcmci_effect' in row and row['pcmci_effect'] is not None:
                         row['pcmci_error'] = row['pcmci_effect'] - row['true_effect']

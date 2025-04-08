@@ -1,0 +1,24 @@
+{
+    "auto_coeff": 0.5,
+    "cross_coeff": 0.5,
+    "noise_sigma": 2.542105263157895,
+    "n_vars": 4,
+    "T": 500,
+    "pc_alpha": 0.05,
+    "tau_max": 4,
+    "n_boot": 200,
+    "seed": null,
+    "effect_pairs": [
+        [
+            [
+                0,
+                -2
+            ],
+            [
+                3,
+                0
+            ]
+        ]
+    ],
+    "timestamp": "2025-04-05_23-59-34"
+}

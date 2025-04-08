@@ -1,0 +1,17 @@
+{
+    "total_time": 138.06459403038025,
+    "data_generation_time": 0.0021445751190185547,
+    "discovery_times": {
+        "pcmci": 0.1546773910522461,
+        "bootstrap": 1.5818367004394531
+    },
+    "effect_times": {
+        "0_-2_to_3_0": {
+            "true_effect": 0.1128695011138916,
+            "true_graph_effect": 0.4766414165496826,
+            "pcmci_effect": 1.6061551570892334,
+            "bagged_effect": 1.605055332183838,
+            "bootstrap_effects": 131.7011775970459
+        }
+    }
+}

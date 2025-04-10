@@ -1,0 +1,88 @@
+{
+    "X": [
+        0,
+        -2
+    ],
+    "Y": [
+        3,
+        0
+    ],
+    "true_effect": 0.010099994949996471,
+    "true_graph_effect": 0.08017411530890756,
+    "pcmci_effect": 0.07473303109474834,
+    "bagged_effect": null,
+    "bootstrap_stats": {
+        "mean": 0.0726889828860436,
+        "std": 0.016064522420057185,
+        "ci_lower": 0.06119711583145117,
+        "ci_upper": 0.08418084994063603,
+        "n_total": 200,
+        "n_nan": 190,
+        "estimation_success_rate": 0.05
+    },
+    "adjustment_sets": {
+        "true_graph": [
+            [
+                2,
+                -3
+            ],
+            [
+                2,
+                -2
+            ],
+            [
+                3,
+                -2
+            ],
+            [
+                1,
+                -2
+            ]
+        ],
+        "pcmci": [
+            [
+                2,
+                -3
+            ],
+            [
+                3,
+                -2
+            ]
+        ],
+        "bagged": null,
+        "bootstrap_summary": {
+            "mean_size": 0.24,
+            "std_size": 1.0827742146911332,
+            "min_size": 0,
+            "max_size": 7,
+            "unique_graphs": 200
+        }
+    },
+    "confidence_intervals": {
+        "true_graph": [
+            -0.004810438973621559,
+            0.16515866959143666
+        ],
+        "pcmci": [
+            -0.010175334277648385,
+            0.15964139646714506
+        ],
+        "bagged": [
+            null,
+            null
+        ],
+        "bootstrap_summary": {
+            "mean_width": 0.1717298599285085,
+            "std_width": 0.009614847445817847,
+            "min_width": 0.1521396529545525,
+            "max_width": 0.19398369127644033
+        }
+    },
+    "timings": {
+        "true_effect": 0.09587359428405762,
+        "true_graph_effect": 0.4857051372528076,
+        "pcmci_effect": 0.6618218421936035,
+        "bagged_effect": 0.44487476348876953,
+        "bootstrap_effects": 57.474706411361694
+    }
+}

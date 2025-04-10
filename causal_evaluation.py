@@ -2277,29 +2277,66 @@ def load_study_results_with_graphs(study_folder, output_folder=None, include_gra
 
 # Example usage
 if __name__ == "__main__":
-    # Set the main study folder path
-    main_study_folder = "full_study_results_2025-04-01_18-05-50"
     
-    # Create a results folder for the analysis
-    results_folder = f"analysis_results_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
-    os.makedirs(results_folder, exist_ok=True)
+    if 1:
+        ### Full Study ###
+
+        ## from causal_evaluation import run_full_study
+        # Define parameter values to test
+        auto_values = np.repeat(np.linspace(0.01,.99,10),5).tolist()
+        cross_values = np.repeat(np.linspace(0.01,.99,10),5).tolist()
+        noise_values = np.repeat(np.linspace(0.1,3.,10),5).tolist()
+        T_values = np.repeat([200,300,400,500,600,700,800,900,1000,1500,2000,3000,5000],5).tolist()
+        n_boot_values = np.repeat([10,50,100,200,300],5).tolist()
+        # Set base parameters
+        base_params = {
+            'auto_coeff': 0.5,
+            'cross_coeff': 0.5,
+            'noise_sigma': 1,
+            'n_vars': 4,
+            'T': 500,  # Smaller dataset for faster execution
+            'pc_alpha': 0.05,
+            'tau_max': 4,
+            'n_boot': 100,  # Fewer bootstrap samples for faster execution
+            'effect_pairs': [((0, -2), (3, 0))]  # Focus on one effect pair
+        }
+        
+        full_results = run_full_extended_study(    
+            auto_values=auto_values,
+            cross_values=cross_values,
+            noise_values=noise_values,
+            T_values=T_values, 
+            n_boot_values=n_boot_values,
+            base_params=base_params,
+            output_dir="full_study_results_{:%Y-%m-%d_%H-%M-%S}".format(datetime.now()),
+            seed=None)
+
     
-    print(f"Loading results from {main_study_folder}...")
     
-    # Load parameter studies using the modified function
-    print("Loading autocorrelation study...")
-    auto_results = modified_load_experiment_results(os.path.join(main_study_folder, "auto_study"), "auto")
-    
-    # Convert to DataFrame
-    auto_df = results_to_dataframe(auto_results, "auto")
-    
-    # Check if bootstrap effects were loaded
-    print(f"Bootstrap effects loaded for {sum('bootstrap_effects' in row for _, row in auto_df.iterrows())} rows")
-    
-    # Print first row with bootstrap effects to verify
-    bootstrap_rows = auto_df[auto_df['bootstrap_effects'].notna()]
-    if not bootstrap_rows.empty:
-        row = bootstrap_rows.iloc[0]
-        print(f"Sample bootstrap effects for {row['effect_key']} at {row['param_name']}={row['param_value']}:")
-        print(f"Number of bootstrap samples: {len(row['bootstrap_effects'])}")
-        print(f"Sample values: {row['bootstrap_effects'][:3]}...")
+    if 0:
+        # Set the main study folder path
+        main_study_folder = "full_study_results_2025-04-01_18-05-50"
+        
+        # Create a results folder for the analysis
+        results_folder = f"analysis_results_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+        os.makedirs(results_folder, exist_ok=True)
+        
+        print(f"Loading results from {main_study_folder}...")
+        
+        # Load parameter studies using the modified function
+        print("Loading autocorrelation study...")
+        auto_results = modified_load_experiment_results(os.path.join(main_study_folder, "auto_study"), "auto")
+        
+        # Convert to DataFrame
+        auto_df = results_to_dataframe(auto_results, "auto")
+        
+        # Check if bootstrap effects were loaded
+        print(f"Bootstrap effects loaded for {sum('bootstrap_effects' in row for _, row in auto_df.iterrows())} rows")
+        
+        # Print first row with bootstrap effects to verify
+        bootstrap_rows = auto_df[auto_df['bootstrap_effects'].notna()]
+        if not bootstrap_rows.empty:
+            row = bootstrap_rows.iloc[0]
+            print(f"Sample bootstrap effects for {row['effect_key']} at {row['param_name']}={row['param_value']}:")
+            print(f"Number of bootstrap samples: {len(row['bootstrap_effects'])}")
+            print(f"Sample values: {row['bootstrap_effects'][:3]}...")

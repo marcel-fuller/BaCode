@@ -172,7 +172,9 @@ def create_causal_model(graph_structure=None, n_vars=4, auto_coeff=0.8, cross_co
     # Create noise distributions
     # Usage
     # Generate unique seeds for each noise generator
-    unique_seeds = np.random.SeedSequence(42).spawn(n_vars)
+    rng = np.random.default_rng()
+    noise_seed = rng.integers(2**31-1)
+    unique_seeds = np.random.SeedSequence(noise_seed).spawn(n_vars)
     noises = [lambda size, seed=seed.generate_state(1)[0], sigma=noise_sigma: 
           create_consistent_noise(seed, sigma, size) 
           for seed in unique_seeds]
@@ -269,12 +271,13 @@ def generate_dataset(links, T=500, noises=None, seed=None, save_path=None):
     """
     # Set random seed if provided
     if seed is None:
-        seed = np.random.randint(0,2**31-1)
-    
+        rng = np.random.default_rng()
+        seed = rng.integers(2**31-1)
+    print (seed)
     # Measure time
     with Timer("data_generation", save_path) as timer:
         # Generate data
-        data, nonstat = toys.structural_causal_process(links=links, T=T, noises=noises)
+        data, nonstat = toys.structural_causal_process(links=links, T=T, noises=noises, seed =seed)
     
     # Create variable names
     n_vars = data.shape[1]
@@ -303,7 +306,7 @@ def generate_dataset(links, T=500, noises=None, seed=None, save_path=None):
             'var_names': var_names,
             'links': linkString,
             'T': T,
-            'seed': seed,
+            'seed': int(seed),
             'nonstat': bool(nonstat),
             'generation_time': timer.elapsed
         }
@@ -369,7 +372,7 @@ def run_pcmci(dataset, pc_alpha=0.05, tau_max=5, cond_ind_test=None, save_path=N
     return results, pcmci, timer.elapsed
 
 
-def run_bootstrap_pcmci(pcmci, pc_alpha=0.05, tau_max=5, n_boot=100, boot_blocklength=10, save_path=None):
+def run_bootstrap_pcmci(pcmci, pc_alpha=0.05, tau_max=5, n_boot=100, boot_blocklength=1, save_path=None):
     """
     Run bootstrapped PCMCI causal discovery.
     

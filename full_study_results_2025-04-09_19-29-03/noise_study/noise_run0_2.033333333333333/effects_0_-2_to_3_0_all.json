@@ -1,0 +1,79 @@
+{
+    "X": [
+        0,
+        -2
+    ],
+    "Y": [
+        3,
+        0
+    ],
+    "true_effect": 0.75,
+    "true_graph_effect": 0.7408796323915113,
+    "pcmci_effect": null,
+    "bagged_effect": null,
+    "bootstrap_stats": {
+        "mean": 0.7527578770041758,
+        "std": 0.0048143851065631195,
+        "ci_lower": 0.7515649307855169,
+        "ci_upper": 0.7539508232228348,
+        "n_total": 200,
+        "n_nan": 135,
+        "estimation_success_rate": 0.325
+    },
+    "adjustment_sets": {
+        "true_graph": [
+            [
+                2,
+                -3
+            ],
+            [
+                2,
+                -2
+            ],
+            [
+                3,
+                -2
+            ],
+            [
+                1,
+                -2
+            ]
+        ],
+        "pcmci": null,
+        "bagged": null,
+        "bootstrap_summary": {
+            "mean_size": 3.09,
+            "std_size": 4.56857745912226,
+            "min_size": 0,
+            "max_size": 13,
+            "unique_graphs": 200
+        }
+    },
+    "confidence_intervals": {
+        "true_graph": [
+            0.6353823906065592,
+            0.8463768741764635
+        ],
+        "pcmci": [
+            null,
+            null
+        ],
+        "bagged": [
+            null,
+            null
+        ],
+        "bootstrap_summary": {
+            "mean_width": 0.22695038598009598,
+            "std_width": 0.009282783711511661,
+            "min_width": 0.2115673086339458,
+            "max_width": 0.2356308967842029
+        }
+    },
+    "timings": {
+        "true_effect": 0.09606575965881348,
+        "true_graph_effect": 0.481048583984375,
+        "pcmci_effect": 8.273124694824219e-05,
+        "bagged_effect": 6.699562072753906e-05,
+        "bootstrap_effects": 256.45340871810913
+    }
+}

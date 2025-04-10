@@ -1,0 +1,13 @@
+{
+    "var_names": [
+        "X1",
+        "X2",
+        "X3",
+        "X4"
+    ],
+    "links": "Variable X1 has parents:\n  X1(t-1) with coefficient 0.5000 and function <lambda>\n  X3(t-1) with coefficient 0.7722 and function <lambda>\nVariable X2 has parents:\n  X2(t-1) with coefficient 0.5000 and function <lambda>\n  X1(t-1) with coefficient 0.7722 and function <lambda>\nVariable X3 has parents:\n  X3(t-1) with coefficient 0.5000 and function <lambda>\nVariable X4 has parents:\n  X4(t-1) with coefficient 0.5000 and function <lambda>\n  X1(t-1) with coefficient 0.7722 and function <lambda>\n  X2(t-1) with coefficient 0.7722 and function <lambda>\n  X3(t-2) with coefficient 0.7722 and function <lambda>\n",
+    "T": 500,
+    "seed": 1560386187,
+    "nonstat": false,
+    "generation_time": 0.001813650131225586
+}

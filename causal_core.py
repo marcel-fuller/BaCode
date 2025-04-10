@@ -274,7 +274,7 @@ def generate_dataset(links, T=500, noises=None, seed=None, save_path=None):
     # Measure time
     with Timer("data_generation", save_path) as timer:
         # Generate data
-        data, nonstat = toys.structural_causal_process(links=links, T=T, noises=noises)
+        data, nonstat = toys.structural_causal_process(links=links, T=T, noises=noises,seed = None)
     
     # Create variable names
     n_vars = data.shape[1]

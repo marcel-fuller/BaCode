@@ -1825,8 +1825,7 @@ def load_study_results(study_folder, output_folder=None):
                     if 'pcmci_effect' in row and row['pcmci_effect'] is not None:
                         row['pcmci_error'] = row['pcmci_effect'] - row['true_effect']
                         row['pcmci_abs_error'] = abs(row['pcmci_error'])
-                        row['pcmci_squared_error'] = row['pcmci_error'] ** 2
-                    
+                        
                     # Calculate bagged errors
                     if 'bagged_effect' in row and row['bagged_effect'] is not None:
                         row['bagged_error'] = row['bagged_effect'] - row['true_effect']
@@ -1838,7 +1837,19 @@ def load_study_results(study_folder, output_folder=None):
                         row['bootstrap_error'] = row['bootstrap_mean'] - row['true_effect']
                         row['bootstrap_abs_error'] = abs(row['bootstrap_error'])
                         row['bootstrap_squared_error'] = row['bootstrap_error'] ** 2
+
+                   # Calculate relative errors for all methods
+                    if row['true_effect'] != 0:
+                        if 'pcmci_error' in row:
+                            row['pcmci_relative_error'] = row['pcmci_error'] / row['true_effect']
+                        if 'true_graph_error' in row:
+                            row['true_graph_relative_error'] = row['true_graph_error'] / row['true_effect']
+                        if 'bagged_error' in row:
+                            row['bagged_relative_error'] = row['bagged_error'] / row['true_effect']
+                        if 'bootstrap_error' in row:
+                            row['bootstrap_relative_error'] = row['bootstrap_error'] / row['true_effect']
                     
+
                     # Check if bootstrap CI covers true value
                     if ('bootstrap_ci_lower' in row and 'bootstrap_ci_upper' in row and
                         row['bootstrap_ci_lower'] is not None and row['bootstrap_ci_upper'] is not None):

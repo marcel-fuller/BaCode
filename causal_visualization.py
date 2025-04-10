@@ -15,10 +15,6 @@ from scipy.stats import gaussian_kde
 from tigramite import plotting as tp
 from tigramite.pcmci import PCMCI
 
-
-# Set Seaborn style
-sns.set_theme(style="whitegrid")
-
 # =====================================================================
 # Global Settings and Constants
 # =====================================================================
@@ -64,8 +60,9 @@ def set_visualization_style():
     import seaborn as sns
     
     # Use seaborn style but with larger fonts and elements
-    sns.set_theme(style="whitegrid")
+    sns.set_theme(style="whitegrid", font_scale=1.2)
     
+    """
     # Increase font sizes
     plt.rcParams.update({
         'font.size': 12,
@@ -76,7 +73,8 @@ def set_visualization_style():
         'legend.fontsize': 10,
         'figure.titlesize': 16
     })
-    
+    """
+
     # Use the same color cycle as our METHOD_COLORS
     plt.rcParams['axes.prop_cycle'] = plt.cycler(color=list(METHOD_COLORS.values()))
     
@@ -445,7 +443,7 @@ def plot_estimation_success_rate(df, param_name=None, save_path=None):
     #ax.set_title(title)
     
     ax.grid(True, alpha=0.3)
-    ax.legend()
+    ax.legend(bbox_to_anchor=(0.5, 1.15), loc='upper center', ncol=len(methods))
     
     # Save if path is provided
     if save_path:
@@ -506,7 +504,7 @@ def plot_effect_histogram(bootstrap_effects, true_effect=None, save_path=None):
     ax.set_xlabel('Effect Size')
     ax.set_ylabel('Frequency')
     #ax.set_title('Distribution of Bootstrap Effect Estimates')
-    ax.legend()
+    ax.legend(bbox_to_anchor=(0.5, 1.15), loc='upper center')
     
     #plt.tight_layout()
     
@@ -584,7 +582,7 @@ def plot_effect_density(bootstrap_effects, true_effect=None, save_path=None):
     ax.set_xlabel('Effect Size')
     ax.set_ylabel('Density')
     #ax.set_title('Density of Bootstrap Effect Estimates')
-    ax.legend()
+    ax.legend(bbox_to_anchor=(0.5, 1.15), loc='upper center')
     
     #plt.tight_layout()
     
@@ -785,7 +783,7 @@ def plot_effect_comparison(results_df, param_name=None, effect_key=None,
     #else:
         #ax.set_title('Effect Comparison Across Methods')
     
-    ax.legend(title='Method')
+    ax.legend(title='Method',bbox_to_anchor=(0.5, 1.15), loc='upper center', ncol=len(methods))
     
     #plt.tight_layout()
     
@@ -834,7 +832,8 @@ def plot_error_comparison(results_df, param_name=None, effect_key=None,
     error_col_map = {
         'abs': '_abs_error',
         'squared': '_squared_error',
-        'raw': '_error'
+        'raw': '_error',
+        'rel': '_relative_error'
     }
     error_suffix = error_col_map.get(error_type, '_abs_error')
     
@@ -842,7 +841,8 @@ def plot_error_comparison(results_df, param_name=None, effect_key=None,
     error_label = {
         'abs': 'Absolute Error',
         'squared': 'Squared Error',
-        'raw': 'Error'
+        'raw': 'Error',
+        'rel': 'Relative Error'
     }.get(error_type, 'Absolute Error')
     
     # Filter DataFrame if effect_key is provided
@@ -850,7 +850,7 @@ def plot_error_comparison(results_df, param_name=None, effect_key=None,
         plot_df = results_df[results_df['effect_key'] == effect_key].copy()
     else:
         plot_df = results_df.copy()
-    
+
     # Check if DataFrame is empty
     if len(plot_df) == 0:
         fig, ax = plt.subplots(figsize=(10, 6))
@@ -858,6 +858,9 @@ def plot_error_comparison(results_df, param_name=None, effect_key=None,
                 ha='center', va='center', fontsize=14)
         return fig
     
+    #None-> nan
+    plot_df.replace([None], np.nan)
+
     # Create figure
     fig, ax = plt.subplots(figsize=FIGURE_SIZES['comparison'])
     
@@ -913,7 +916,7 @@ def plot_error_comparison(results_df, param_name=None, effect_key=None,
     #else:
         #ax.set_title(f'{error_label} Comparison Across Methods')
     
-    ax.legend(title='Method')
+    ax.legend(title='Method', bbox_to_anchor=(0.5, 1.15), loc='upper center', ncol=len(methods))
     
     #plt.tight_layout()
     
@@ -1015,7 +1018,7 @@ def plot_metrics_comparison(results_df, param_name=None, metric='mae',
     ax.set_ylabel(y_label)
     #ax.set_title(f'{y_label} Comparison Across Methods')
     
-    ax.legend(title='Method')
+    ax.legend(title='Method', bbox_to_anchor=(0.5, 1.15), loc='upper center', ncol=len(methods))
     
     #plt.tight_layout()
     
@@ -1026,173 +1029,173 @@ def plot_metrics_comparison(results_df, param_name=None, metric='mae',
     
     return fig
 
-
-def plot_linreg_ci_coverage(df, param_name=None, save_path=None):
-    """
-    Plot coverage rate of linear regression confidence intervals across estimation methods.
-    
-    Parameters
-    ----------
-    df : pandas.DataFrame
-        DataFrame containing study results with confidence interval information
-    param_name : str, optional
-        Name of the parameter to group by (e.g., 'auto', 'cross', 'noise', 'T')
-    save_path : str, optional
-        Path to save the plot
+if 0:
+    def plot_linreg_ci_coverage(df, param_name=None, save_path=None):
+        """
+        Plot coverage rate of linear regression confidence intervals across estimation methods.
         
-    Returns
-    -------
-    matplotlib.figure.Figure
-        The generated figure
-    """
-    
-    # Set up figure
-    fig, ax = plt.subplots(figsize=(10, 6))
-    
-    # Define the methods to track
-    methods = ['true_graph', 'pcmci', 'bagged']
-    method_labels = ['True Graph', 'PCMCI', 'Bagged PCMCI']
-    
-    # Filter to only include rows with the necessary data
-    required_cols = ['true_effect']
-    for method in methods:
-        required_cols.extend([f'{method}_ci_lower', f'{method}_ci_upper'])
-    
-    valid_df = df.dropna(subset=['true_effect']).copy()
-    
-    # Exit if no valid data
-    if len(valid_df) == 0:
-        ax.text(0.5, 0.5, "No valid data with confidence intervals found", 
-                ha='center', va='center', fontsize=14)
-        if save_path:
-            plt.savefig(save_path, dpi=300, bbox_inches='tight')
-        return fig
-    
-    # Calculate coverage for each method
-    for method in methods:
-        if f'{method}_ci_lower' in valid_df.columns and f'{method}_ci_upper' in valid_df.columns:
-            # Calculate whether true effect is within the CI
-            valid_df[f'{method}_ci_covers'] = (
-                (valid_df['true_effect'] >= valid_df[f'{method}_ci_lower']) & 
-                (valid_df['true_effect'] <= valid_df[f'{method}_ci_upper'])
+        Parameters
+        ----------
+        df : pandas.DataFrame
+            DataFrame containing study results with confidence interval information
+        param_name : str, optional
+            Name of the parameter to group by (e.g., 'auto', 'cross', 'noise', 'T')
+        save_path : str, optional
+            Path to save the plot
+            
+        Returns
+        -------
+        matplotlib.figure.Figure
+            The generated figure
+        """
+        
+        # Set up figure
+        fig, ax = plt.subplots(figsize=(10, 6))
+        
+        # Define the methods to track
+        methods = ['true_graph', 'pcmci', 'bagged']
+        method_labels = ['True Graph', 'PCMCI', 'Bagged PCMCI']
+        
+        # Filter to only include rows with the necessary data
+        required_cols = ['true_effect']
+        for method in methods:
+            required_cols.extend([f'{method}_ci_lower', f'{method}_ci_upper'])
+        
+        valid_df = df.dropna(subset=['true_effect']).copy()
+        
+        # Exit if no valid data
+        if len(valid_df) == 0:
+            ax.text(0.5, 0.5, "No valid data with confidence intervals found", 
+                    ha='center', va='center', fontsize=14)
+            if save_path:
+                plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            return fig
+        
+        # Calculate coverage for each method
+        for method in methods:
+            if f'{method}_ci_lower' in valid_df.columns and f'{method}_ci_upper' in valid_df.columns:
+                # Calculate whether true effect is within the CI
+                valid_df[f'{method}_ci_covers'] = (
+                    (valid_df['true_effect'] >= valid_df[f'{method}_ci_lower']) & 
+                    (valid_df['true_effect'] <= valid_df[f'{method}_ci_upper'])
+                )
+        
+        # Plotting logic depends on whether we're grouping by parameter
+        if param_name and param_name in valid_df.columns:
+            # Group by parameter value
+            param_values = sorted(valid_df['param_value'].unique())
+            
+            # Calculate coverage rate for each parameter value and method
+            coverage_data = []
+            
+            for param_val in param_values:
+                subset = valid_df[valid_df['param_value'] == param_val]
+                
+                for method, label in zip(methods, method_labels):
+                    if f'{method}_ci_covers' in subset.columns:
+                        coverage = subset[f'{method}_ci_covers'].mean() * 100
+                        coverage_data.append({
+                            'param_value': param_val,
+                            'Method': label,
+                            'Coverage Rate (%)': coverage
+                        })
+            
+            # Convert to DataFrame for plotting
+            coverage_df = pd.DataFrame(coverage_data)
+            
+            # Create line plot
+            sns.lineplot(
+                data=coverage_df,
+                x='param_value',
+                y='Coverage Rate (%)',
+                hue='Method',
+                marker='o',
+                ax=ax
             )
-    
-    # Plotting logic depends on whether we're grouping by parameter
-    if param_name and param_name in valid_df.columns:
-        # Group by parameter value
-        param_values = sorted(valid_df['param_value'].unique())
-        
-        # Calculate coverage rate for each parameter value and method
-        coverage_data = []
-        
-        for param_val in param_values:
-            subset = valid_df[valid_df['param_value'] == param_val]
+            
+            # Add the 95% reference line
+            ax.axhline(y=95, color='gray', linestyle='--', alpha=0.7, label='95% Target')
+            
+            # Improve axis labels
+            ax.set_xlabel(f'{param_name.capitalize()} Value')
+            
+        else:
+            # Calculate overall coverage rates
+            coverage_data = []
             
             for method, label in zip(methods, method_labels):
-                if f'{method}_ci_covers' in subset.columns:
-                    coverage = subset[f'{method}_ci_covers'].mean() * 100
+                if f'{method}_ci_covers' in valid_df.columns:
+                    coverage = valid_df[f'{method}_ci_covers'].mean() * 100
                     coverage_data.append({
-                        'param_value': param_val,
                         'Method': label,
                         'Coverage Rate (%)': coverage
                     })
-        
-        # Convert to DataFrame for plotting
-        coverage_df = pd.DataFrame(coverage_data)
-        
-        # Create line plot
-        sns.lineplot(
-            data=coverage_df,
-            x='param_value',
-            y='Coverage Rate (%)',
-            hue='Method',
-            marker='o',
-            ax=ax
-        )
-        
-        # Add the 95% reference line
-        ax.axhline(y=95, color='gray', linestyle='--', alpha=0.7, label='95% Target')
-        
-        # Improve axis labels
-        ax.set_xlabel(f'{param_name.capitalize()} Value')
-        
-    else:
-        # Calculate overall coverage rates
-        coverage_data = []
-        
-        for method, label in zip(methods, method_labels):
-            if f'{method}_ci_covers' in valid_df.columns:
-                coverage = valid_df[f'{method}_ci_covers'].mean() * 100
-                coverage_data.append({
-                    'Method': label,
-                    'Coverage Rate (%)': coverage
-                })
-        
-        # Convert to DataFrame and sort by coverage rate
-        coverage_df = pd.DataFrame(coverage_data)
-        coverage_df = coverage_df.sort_values('Coverage Rate (%)', ascending=False)
-        
-        # Create bar plot
-        bars = ax.bar(
-            coverage_df['Method'],
-            coverage_df['Coverage Rate (%)'],
-            alpha=0.7
-        )
-        
-        # Add the 95% reference line
-        ax.axhline(y=95, color='gray', linestyle='--', alpha=0.7, label='95% Target')
-        
-        # Add value labels on bars
-        for i, bar in enumerate(bars):
-            height = bar.get_height()
-            ax.text(
-                bar.get_x() + bar.get_width()/2.,
-                height + 1,
-                f'{height:.1f}%',
-                ha='center',
-                va='bottom'
+            
+            # Convert to DataFrame and sort by coverage rate
+            coverage_df = pd.DataFrame(coverage_data)
+            coverage_df = coverage_df.sort_values('Coverage Rate (%)', ascending=False)
+            
+            # Create bar plot
+            bars = ax.bar(
+                coverage_df['Method'],
+                coverage_df['Coverage Rate (%)'],
+                alpha=0.7
             )
+            
+            # Add the 95% reference line
+            ax.axhline(y=95, color='gray', linestyle='--', alpha=0.7, label='95% Target')
+            
+            # Add value labels on bars
+            for i, bar in enumerate(bars):
+                height = bar.get_height()
+                ax.text(
+                    bar.get_x() + bar.get_width()/2.,
+                    height + 1,
+                    f'{height:.1f}%',
+                    ha='center',
+                    va='bottom'
+                )
+            
+            # Improve axis
+            ax.set_ylim(0, max(max(coverage_df['Coverage Rate (%)']), 95) * 1.1)
+            ax.set_xlabel('')
         
-        # Improve axis
-        ax.set_ylim(0, max(max(coverage_df['Coverage Rate (%)']), 95) * 1.1)
-        ax.set_xlabel('')
-    
-    # Add counts to legend
-    if param_name:
-        handles, labels = ax.get_legend_handles_labels()
-        new_labels = []
-        for method, label in zip(methods, method_labels):
-            if f'{method}_ci_covers' in valid_df.columns:
-                count = valid_df[f'{method}_ci_covers'].count()
-                new_labels.append(f"{label} (n={count})")
-            else:
-                new_labels.append(label)
+        # Add counts to legend
+        if param_name:
+            handles, labels = ax.get_legend_handles_labels()
+            new_labels = []
+            for method, label in zip(methods, method_labels):
+                if f'{method}_ci_covers' in valid_df.columns:
+                    count = valid_df[f'{method}_ci_covers'].count()
+                    new_labels.append(f"{label} (n={count})")
+                else:
+                    new_labels.append(label)
+            
+            # Replace legend with counts
+            if len(handles) >= len(methods):
+                ax.legend(handles[:len(methods)], new_labels, title="Method")
         
-        # Replace legend with counts
-        if len(handles) >= len(methods):
-            ax.legend(handles[:len(methods)], new_labels, title="Method")
-    
-    # Add title and y-label
-    #ax.set_title(f'Linear Regression CI Coverage by {"Method" if not param_name else param_name.capitalize()}')
-    ax.set_ylabel('Coverage Rate (%)')
-    
-    # Add reference to the plot
-    fig.text(
-        0.01, 0.01, 
-        "Coverage rate = % of cases where true effect is within the linear regression CI",
-        fontsize=8, 
-        style='italic'
-    )
-    
-    # Add grid
-    ax.grid(True, linestyle='--', alpha=0.7)
-    
-    # Save if path is provided
-    if save_path:
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        plt.savefig(save_path, dpi=300, bbox_inches='tight')
-    
-    return fig
+        # Add title and y-label
+        #ax.set_title(f'Linear Regression CI Coverage by {"Method" if not param_name else param_name.capitalize()}')
+        ax.set_ylabel('Coverage Rate (%)')
+        
+        # Add reference to the plot
+        fig.text(
+            0.01, 0.01, 
+            "Coverage rate = % of cases where true effect is within the linear regression CI",
+            fontsize=8, 
+            style='italic'
+        )
+        
+        # Add grid
+        ax.grid(True, linestyle='--', alpha=0.7)
+        
+        # Save if path is provided
+        if save_path:
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        
+        return fig
 
 # =====================================================================
 # CI Visualization
@@ -1899,6 +1902,7 @@ def plot_pipeline_timing_by_T(df, save_path=None):
     
     # Set log scale for better visualization
     ax.set_yscale('log')
+    ax.set_xscale('log')
     
     # Add labels and title
     ax.set_xlabel('Time Series Length (T)')
@@ -1910,7 +1914,7 @@ def plot_pipeline_timing_by_T(df, save_path=None):
     ax.grid(True, alpha=0.3)
     
     # Add legend
-    ax.legend(title='Pipeline')
+    ax.legend(title='Pipeline', bbox_to_anchor=(0.5, 1.15), loc='upper center', ncol=3)
     
     # Save if path is provided
     if save_path:
@@ -2014,7 +2018,7 @@ def plot_bootstrap_timing_by_n_boot(df, save_path=None):
     ax.grid(True, alpha=0.3)
     
     # Add legend
-    ax.legend(title='Pipeline')
+    ax.legend(title='Pipeline', bbox_to_anchor=(0.5, 1.15), loc='upper center', ncol=3)
     
     # Add annotation about linear relationship
     ax.text(0.05, 0.95, "Note: Dashed lines show linear trends", 
@@ -2112,6 +2116,7 @@ def plot_improved_timing_analysis(df, save_path=None):
     
     # Set log scale for y-axis to handle wide range of values
     ax1.set_yscale('log')
+    ax1.set_xscale('log')
     
     # Add horizontal line at ratio=1 (equal time)
     ax1.axhline(y=1, color='gray', linestyle='--', alpha=0.7)
@@ -2125,7 +2130,7 @@ def plot_improved_timing_analysis(df, save_path=None):
     ax1.grid(True, alpha=0.3)
     
     # Add legend and annotation
-    ax1.legend(title='Method')
+    ax1.legend(title='Method', bbox_to_anchor=(0.5, 1.15), loc='upper center', ncol=10)
     ax1.text(T_values[-1], 1.1, "Equal Time", ha='right', va='bottom', 
              color='gray', fontsize=9, fontstyle='italic')
     
@@ -2283,7 +2288,7 @@ def plot_compact_timing_analysis(df, save_path=None):
     ax1.grid(True, alpha=0.3)
     
     # Add legend and annotation
-    ax1.legend(title='Method')
+    ax1.legend(title='Method', bbox_to_anchor=(0.5, 1.15), loc='upper center', ncol=3)
     ax1.text(T_values[-1], 1.1, "Equal Time", ha='right', va='bottom', 
              color='gray', fontsize=9, fontstyle='italic')
     
@@ -2441,13 +2446,13 @@ def plot_bootstrap_distribution_with_methods(bootstrap_effects, true_effect=None
     ci_upper = mean + 1.96 * std
     
     # Plot histogram
-    plt.hist(effects, bins=20, alpha=0.5, density=True, label='Bootstrap Distribution')
+    plt.hist(effects, bins=20, alpha=0.5, density=False, label='Bootstrap Distribution')
     
     # Add KDE
     kde = gaussian_kde(effects)
     x = np.linspace(min(effects) - 0.1, max(effects) + 0.1, 1000)
     y = kde(x)
-    plt.plot(x, y, 'k-', linewidth=1.5, label='Density Estimate')
+    #plt.plot(x, y, 'k-', linewidth=1.5, label='Density Estimate')
     
     # Add vertical lines for different methods
     plt.axvline(mean, color='blue', linestyle='--', linewidth=2,
@@ -2476,7 +2481,7 @@ def plot_bootstrap_distribution_with_methods(bootstrap_effects, true_effect=None
     plt.xlabel('Effect Size')
     plt.ylabel('Density')
     #plt.title(title if title else 'Bootstrap Effect Distribution with Method Comparison')
-    plt.legend()
+    plt.legend(bbox_to_anchor=(0.5, 1.15), loc='upper center', ncol=4)
     plt.grid(True)
     
     if save_path:
@@ -3019,7 +3024,7 @@ def plot_bootstrap_ci_scatter(df, param_values=None,  save_path=None,effect_key=
         #ax.set_title(f'Bootstrap Estimates with CIs (Param Value = {param_value})')
         ax.set_xlabel('Effect Estimate')
         ax.set_ylabel('Bootstrap Replica')
-        ax.legend(loc='upper left', bbox_to_anchor=(1.01, 1))
+        ax.legend(bbox_to_anchor=(0.5, 1.15), loc='upper center', ncol=6)
         
         # Remove y-ticks
         ax.set_yticks([])
@@ -3238,7 +3243,7 @@ def plot_ci_distribution_comparison(df, param_value, effect_key=None, save_path=
     ax.set_ylabel('Density')
     
     # Add legend
-    ax.legend(loc='upper left', bbox_to_anchor=(1.01, 1))
+    ax.legend( bbox_to_anchor=(0.5, 1.15), loc='upper center', ncol=len(methods))
     
     # Add grid
     ax.grid(True, alpha=0.3)
@@ -3314,7 +3319,7 @@ def plot_adjustment_sets(df, param_name, save_path=None):
     ax.set_xlabel(f'{param_name.capitalize()} Value')
     ax.set_ylabel('Adjustment Set Size')
     #ax.set_title(f'Adjustment Set Size Comparison - {param_name.capitalize()}')
-    ax.legend()
+    ax.legend(bbox_to_anchor=(0.5, 1.15), loc='upper center', ncol=len(methods))
     ax.grid(True)
     
     if save_path:
@@ -3763,7 +3768,7 @@ def plot_timing_comparison(df, param_name, save_path=None):
     ax.set_xlabel(f'{param_name.capitalize()} Value')
     ax.set_ylabel('Computation Time (seconds)')
     #ax.set_title(f'Computation Time Comparison - {param_name.capitalize()}')
-    ax.legend()
+    ax.legend( bbox_to_anchor=(0.5, 1.15), loc='upper center', ncol=len(methods))
     ax.grid(True)
     
     if save_path:
@@ -3872,7 +3877,7 @@ def plot_discovery_estimation_ratio_by_T(df, save_path=None):
     ax1.grid(True, alpha=0.3)
     
     # Add legend
-    ax1.legend(title='Method')
+    ax1.legend(title='Method', bbox_to_anchor=(0.5, 1.15), loc='upper center', ncol=3)
     
     # Annotate the equal time line
     ax1.text(T_values[-1], 1.1, "Equal Time", ha='right', va='bottom', 
@@ -4123,7 +4128,11 @@ def generate_all_plots(study_folder, results_folder, studies=None):
         # Bias (signed error)
         bias_path = os.path.join(results_folder, f"{param_name}_bias.pdf")
         plot_error_comparison(df, param_name, error_type='raw', save_path=bias_path)
-        plot_info['error'][param_name] = {'abs': abs_error_path, 'bias': bias_path}
+        #Relative error
+        rel_path = os.path.join(results_folder, f"{param_name}_rel_error.pdf")
+        plot_error_comparison(df, param_name, error_type='rel', save_path=rel_path)
+
+        plot_info['error'][param_name] = {'abs': abs_error_path, 'bias': bias_path, 'rel':rel_path}
         
         
         # 4. Effect comparison
@@ -4281,3 +4290,26 @@ def generate_all_plots(study_folder, results_folder, studies=None):
     print(f"All plots generated and saved to {results_folder}")
     
     return plot_info
+
+if __name__ == "__main__":
+    from causal_evaluation import load_study_results
+
+    from datetime import datetime
+    # Filter out specific FutureWarnings
+    import warnings
+    warnings.filterwarnings("ignore", category=FutureWarning, 
+                        message="use_inf_as_na option is deprecated")
+    warnings.filterwarnings("ignore", category=FutureWarning, 
+                        message="When grouping with a length-1 list-like")
+    
+
+    # Set the main study folder path
+    main_study_folder = "full_study_results_2025-04-05_14-00-23"
+    studies = None
+
+    # Create a results folder for the analysis
+    results_folder = f"analysis_results_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+    os.makedirs(results_folder, exist_ok=True)
+
+    print("Loading study results and generating all plots...")
+    plot_info = generate_all_plots(main_study_folder, results_folder, studies)

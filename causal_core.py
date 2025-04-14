@@ -3,6 +3,8 @@ Core functionality for causal discovery and effect estimation.
 
 This module provides the essential functions for creating causal models,
 generating data, running causal discovery, and estimating causal effects.
+This module is building on the Tigramite framework:
+https://github.com/jakobrunge/tigramite/
 """
 
 import os
@@ -676,7 +678,7 @@ def estimate_causal_effect(graph, dataframe, X, Y, save_path=None):
                 intervention_data = np.zeros((1, 1))  # X=0
                 y2 = causal_effects.predict_total_effect(intervention_data=intervention_data)
                 
-                # Calculate causal effect as the difference
+                # Cahttps://github.com/jakobrunge/tigramite/lculate causal effect as the difference
                 effect = (y1 - y2)[0]
         except ValueError as e:
             # Handle invalid graph edge or other ValueError
@@ -960,9 +962,7 @@ def estimate_causal_effect_with_confidence(graph, dataframe, X, Y, save_path=Non
                 # Calculate causal effect as the difference
                 effect = (y1 - y2)[0]
                 
-                # Now calculate confidence intervals using statsmodels
-                # Extract data used for the model to refit with statsmodels
-                # First get the internal data from causal_effects
+                # calculate confidence intervals using statsmodels
                 try:
                     # Calculate the causal effect using statsmodels directly
                     if adjustment_set is not None:

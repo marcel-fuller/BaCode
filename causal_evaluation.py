@@ -1825,7 +1825,8 @@ def load_study_results(study_folder, output_folder=None):
                     if 'pcmci_effect' in row and row['pcmci_effect'] is not None:
                         row['pcmci_error'] = row['pcmci_effect'] - row['true_effect']
                         row['pcmci_abs_error'] = abs(row['pcmci_error'])
-                        
+                        row['pcmci_squared_error'] = row['pcmci_error'] ** 2
+
                     # Calculate bagged errors
                     if 'bagged_effect' in row and row['bagged_effect'] is not None:
                         row['bagged_error'] = row['bagged_effect'] - row['true_effect']
@@ -1842,12 +1843,16 @@ def load_study_results(study_folder, output_folder=None):
                     if row['true_effect'] != 0:
                         if 'pcmci_error' in row:
                             row['pcmci_relative_error'] = row['pcmci_error'] / row['true_effect']
+                            row['pcmci_relative_squared_error'] = row['pcmci_relative_error']**2
                         if 'true_graph_error' in row:
                             row['true_graph_relative_error'] = row['true_graph_error'] / row['true_effect']
+                            row['true_graph_relative_squared_error'] = row['true_graph_relative_error']**2
                         if 'bagged_error' in row:
                             row['bagged_relative_error'] = row['bagged_error'] / row['true_effect']
+                            row['bagged_relative_squared_error'] = row['bagged_relative_error']**2
                         if 'bootstrap_error' in row:
                             row['bootstrap_relative_error'] = row['bootstrap_error'] / row['true_effect']
+                            row['bootstrap_relative_squared_error'] = row['bootstrap_relative_error']**2
                     
 
                     # Check if bootstrap CI covers true value
@@ -2288,11 +2293,12 @@ def load_study_results_with_graphs(study_folder, output_folder=None, include_gra
 
 # Example usage
 if __name__ == "__main__":
-    
-    if 1:
+    # Runs a full study with an extensive parameter set
+
+
+    if 0:
         ### Full Study ###
 
-        ## from causal_evaluation import run_full_study
         # Define parameter values to test
         auto_values = np.repeat(np.linspace(0.01,.99,10),5).tolist()
         cross_values = np.repeat(np.linspace(0.01,.99,10),5).tolist()
@@ -2322,32 +2328,6 @@ if __name__ == "__main__":
             output_dir="full_study_results_{:%Y-%m-%d_%H-%M-%S}".format(datetime.now()),
             seed=None)
 
+    else:
+        print("run full study currently commented out. Be aware that the full study takes a long time.")
     
-    
-    if 0:
-        # Set the main study folder path
-        main_study_folder = "full_study_results_2025-04-01_18-05-50"
-        
-        # Create a results folder for the analysis
-        results_folder = f"analysis_results_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
-        os.makedirs(results_folder, exist_ok=True)
-        
-        print(f"Loading results from {main_study_folder}...")
-        
-        # Load parameter studies using the modified function
-        print("Loading autocorrelation study...")
-        auto_results = modified_load_experiment_results(os.path.join(main_study_folder, "auto_study"), "auto")
-        
-        # Convert to DataFrame
-        auto_df = results_to_dataframe(auto_results, "auto")
-        
-        # Check if bootstrap effects were loaded
-        print(f"Bootstrap effects loaded for {sum('bootstrap_effects' in row for _, row in auto_df.iterrows())} rows")
-        
-        # Print first row with bootstrap effects to verify
-        bootstrap_rows = auto_df[auto_df['bootstrap_effects'].notna()]
-        if not bootstrap_rows.empty:
-            row = bootstrap_rows.iloc[0]
-            print(f"Sample bootstrap effects for {row['effect_key']} at {row['param_name']}={row['param_value']}:")
-            print(f"Number of bootstrap samples: {len(row['bootstrap_effects'])}")
-            print(f"Sample values: {row['bootstrap_effects'][:3]}...")

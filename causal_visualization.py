@@ -25,15 +25,32 @@ METHOD_COLORS = {
     'True_effect': '#c62828',  # Deep red for absolute truth
     'True Effect': '#c62828',  # Deep red for absolute truth
     'True_graph': '#9c27b0',   # Medium purple for true graph estimate
+    'True Graph': '#9c27b0',   # Medium purple for true graph estimate
     
     # Methods ladder - complementary colors
     'Pcmci': '#f57f17',        # Amber for basic method
+    'PCMCI': '#f57f17',        # Amber for basic method
     'Bagged': '#00897b',       # Teal for middle method
+    'Bagged PCMCI': '#00897b',       # Teal for middle method
     'Bootstrap': '#1565c0',    # Blue for most advanced method
+    'bootstrap': '#1565c0',    # Blue for most advanced method
 
+    #Pipeline
     'PCMCI → Effect': '#f57f17',        # Amber for basic method
     'Bagged PCMCI → Effect':'#00897b',       # Teal for middle method
     'Bootstrap PCMCI → Effect': '#1565c0',    # Blue for most advanced method
+
+    # CIs
+    'true_graph_linreg': '#9c27b0',   # Medium purple for true graph estimate
+    'pcmci_linreg': '#f57f17',        # Amber for basic method
+    'bagged_linreg': '#00897b',       # Teal for middle method
+    'bootstrap_combined': '#a3c9f5',    # Blue for most advanced method
+    'bootstrap_distribution': '#1565c0',
+    'bootstrap_conservative': '#000066',
+    'Bootstrap Distribution': '#1565c0',    # Blue for most advanced method
+    'Bootstrap Combined': '#a3c9f5',
+    'Bootstrap Conservative': '#000066'
+
 }
 
 # Method name mapping for display
@@ -42,7 +59,14 @@ METHOD_LABELS = {
     'Pcmci': 'PCMCI',
     'Bagged': 'Bagged PCMCI',
     'Bootstrap': 'Bootstrap PCMCI',
-    'True_effect': 'True Effect'
+    'True_effect': 'True Effect',
+
+    'true_graph_linreg': 'True Graph',   # Medium purple for true graph estimate
+    'pcmci_linreg': 'PCMCI',      # Amber for basic method
+    'bagged_linreg': 'Bagged PCMCI',       # Teal for middle method
+    'bootstrap_distribution': 'Bootstrap Distribution',   # Blue for most advanced method
+    'bootstrap_combined': 'Bootstrap Combined',
+    'bootstrap_conservative': 'Bootstrap Conservative'
 }
 
 # Standard figure sizes for different types of plots
@@ -377,7 +401,7 @@ def plot_estimation_success_rate(df, param_name=None, save_path=None):
             ax=ax
         )       
         
-        ax.set_xlabel(f'{param_name.capitalize()} Value')
+        ax.set_xlabel(f'{param_name} Value')
         
     else:
         # Calculate overall success rates
@@ -439,7 +463,7 @@ def plot_estimation_success_rate(df, param_name=None, save_path=None):
     
     title = 'Effect Estimation Success Rate'
     if param_name:
-        title += f' by {param_name.capitalize()}'
+        title += f' by {param_name}'
     #ax.set_title(title)
     
     ax.grid(True, alpha=0.3)
@@ -718,7 +742,7 @@ def plot_effect_comparison(results_df, param_name=None, effect_key=None,
     if param_name is not None:
         plot_df = plot_df[plot_df['param_name'] == param_name].copy()
         x_var = 'param_value'
-        x_label = f'{param_name.capitalize()} Value'
+        x_label = f'{param_name} Value'
     else:
         # If no param_name, use effect_key as categorical variable
         x_var = 'effect_key'
@@ -800,7 +824,7 @@ def plot_effect_comparison(results_df, param_name=None, effect_key=None,
 # =====================================================================
 
 def plot_error_comparison(results_df, param_name=None, effect_key=None, 
-                         methods=None, error_type='abs', save_path=None):
+                         methods=None, error_type='abs', save_path=None, rms = False, errorCI=None):
     """
     Plot comparison of estimation errors across methods.
     
@@ -838,12 +862,20 @@ def plot_error_comparison(results_df, param_name=None, effect_key=None,
     error_suffix = error_col_map.get(error_type, '_abs_error')
     
     # Set error label based on type
-    error_label = {
-        'abs': 'Absolute Error',
-        'squared': 'Squared Error',
-        'raw': 'Error',
-        'rel': 'Relative Error'
-    }.get(error_type, 'Absolute Error')
+    if not rms:
+        error_label = {
+            'abs': 'Absolute Error',
+            'squared': 'Squared Error',
+            'raw': 'Error',
+            'rel': 'Relative Error'
+        }.get(error_type, 'Absolute Error')
+    else:
+        error_label = {
+            'abs': 'RMSE',
+            'squared': 'Squared Error',
+            'raw': 'RMSE',
+            'rel': 'RMSE (relative)'
+        }.get(error_type, 'Absolute Error')
     
     # Filter DataFrame if effect_key is provided
     if effect_key is not None:
@@ -868,7 +900,7 @@ def plot_error_comparison(results_df, param_name=None, effect_key=None,
     if param_name is not None:
         plot_df = plot_df[plot_df['param_name'] == param_name].copy()
         x_var = 'param_value'
-        x_label = f'{param_name.capitalize()} Value'
+        x_label = f'{param_name} Value'
     else:
         # If no param_name, use effect_key as categorical variable
         x_var = 'effect_key'
@@ -905,8 +937,13 @@ def plot_error_comparison(results_df, param_name=None, effect_key=None,
         plt.xticks(rotation=45)
     else:
         # Line plot for parameter study
-        sns.lineplot(data=melt_df, x=x_var, y=error_label, hue='Method', 
-                    marker='o', ax=ax,palette=METHOD_COLORS)
+        if rms:
+            sns.lineplot(data=melt_df, x=x_var, y=error_label, hue='Method', 
+                    marker='o', ax=ax,palette=METHOD_COLORS, estimator= lambda x: np.sqrt(np.sum(x**2)), errorbar=errorCI)
+    
+        else:
+            sns.lineplot(data=melt_df, x=x_var, y=error_label, hue='Method', 
+                    marker='o', ax=ax,palette=METHOD_COLORS, errorbar=errorCI)
     
     # Add labels and title
     ax.set_xlabel(x_label)
@@ -966,7 +1003,7 @@ def plot_metrics_comparison(results_df, param_name=None, metric='mae',
                     ha='center', va='center', fontsize=14)
             return fig
         x_var = param_name
-        x_label = f'{param_name.capitalize()} Value'
+        x_label = f'{param_name} Value'
     else:
         # If no param_name, use index as x-axis
         plot_df = plot_df.reset_index(drop=True)
@@ -1021,700 +1058,6 @@ def plot_metrics_comparison(results_df, param_name=None, metric='mae',
     ax.legend(title='Method', bbox_to_anchor=(0.5, 1.15), loc='upper center', ncol=len(methods))
     
     #plt.tight_layout()
-    
-    # Save if path is provided
-    if save_path:
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        plt.savefig(save_path, dpi=300, bbox_inches='tight')
-    
-    return fig
-
-if 0:
-    def plot_linreg_ci_coverage(df, param_name=None, save_path=None):
-        """
-        Plot coverage rate of linear regression confidence intervals across estimation methods.
-        
-        Parameters
-        ----------
-        df : pandas.DataFrame
-            DataFrame containing study results with confidence interval information
-        param_name : str, optional
-            Name of the parameter to group by (e.g., 'auto', 'cross', 'noise', 'T')
-        save_path : str, optional
-            Path to save the plot
-            
-        Returns
-        -------
-        matplotlib.figure.Figure
-            The generated figure
-        """
-        
-        # Set up figure
-        fig, ax = plt.subplots(figsize=(10, 6))
-        
-        # Define the methods to track
-        methods = ['true_graph', 'pcmci', 'bagged']
-        method_labels = ['True Graph', 'PCMCI', 'Bagged PCMCI']
-        
-        # Filter to only include rows with the necessary data
-        required_cols = ['true_effect']
-        for method in methods:
-            required_cols.extend([f'{method}_ci_lower', f'{method}_ci_upper'])
-        
-        valid_df = df.dropna(subset=['true_effect']).copy()
-        
-        # Exit if no valid data
-        if len(valid_df) == 0:
-            ax.text(0.5, 0.5, "No valid data with confidence intervals found", 
-                    ha='center', va='center', fontsize=14)
-            if save_path:
-                plt.savefig(save_path, dpi=300, bbox_inches='tight')
-            return fig
-        
-        # Calculate coverage for each method
-        for method in methods:
-            if f'{method}_ci_lower' in valid_df.columns and f'{method}_ci_upper' in valid_df.columns:
-                # Calculate whether true effect is within the CI
-                valid_df[f'{method}_ci_covers'] = (
-                    (valid_df['true_effect'] >= valid_df[f'{method}_ci_lower']) & 
-                    (valid_df['true_effect'] <= valid_df[f'{method}_ci_upper'])
-                )
-        
-        # Plotting logic depends on whether we're grouping by parameter
-        if param_name and param_name in valid_df.columns:
-            # Group by parameter value
-            param_values = sorted(valid_df['param_value'].unique())
-            
-            # Calculate coverage rate for each parameter value and method
-            coverage_data = []
-            
-            for param_val in param_values:
-                subset = valid_df[valid_df['param_value'] == param_val]
-                
-                for method, label in zip(methods, method_labels):
-                    if f'{method}_ci_covers' in subset.columns:
-                        coverage = subset[f'{method}_ci_covers'].mean() * 100
-                        coverage_data.append({
-                            'param_value': param_val,
-                            'Method': label,
-                            'Coverage Rate (%)': coverage
-                        })
-            
-            # Convert to DataFrame for plotting
-            coverage_df = pd.DataFrame(coverage_data)
-            
-            # Create line plot
-            sns.lineplot(
-                data=coverage_df,
-                x='param_value',
-                y='Coverage Rate (%)',
-                hue='Method',
-                marker='o',
-                ax=ax
-            )
-            
-            # Add the 95% reference line
-            ax.axhline(y=95, color='gray', linestyle='--', alpha=0.7, label='95% Target')
-            
-            # Improve axis labels
-            ax.set_xlabel(f'{param_name.capitalize()} Value')
-            
-        else:
-            # Calculate overall coverage rates
-            coverage_data = []
-            
-            for method, label in zip(methods, method_labels):
-                if f'{method}_ci_covers' in valid_df.columns:
-                    coverage = valid_df[f'{method}_ci_covers'].mean() * 100
-                    coverage_data.append({
-                        'Method': label,
-                        'Coverage Rate (%)': coverage
-                    })
-            
-            # Convert to DataFrame and sort by coverage rate
-            coverage_df = pd.DataFrame(coverage_data)
-            coverage_df = coverage_df.sort_values('Coverage Rate (%)', ascending=False)
-            
-            # Create bar plot
-            bars = ax.bar(
-                coverage_df['Method'],
-                coverage_df['Coverage Rate (%)'],
-                alpha=0.7
-            )
-            
-            # Add the 95% reference line
-            ax.axhline(y=95, color='gray', linestyle='--', alpha=0.7, label='95% Target')
-            
-            # Add value labels on bars
-            for i, bar in enumerate(bars):
-                height = bar.get_height()
-                ax.text(
-                    bar.get_x() + bar.get_width()/2.,
-                    height + 1,
-                    f'{height:.1f}%',
-                    ha='center',
-                    va='bottom'
-                )
-            
-            # Improve axis
-            ax.set_ylim(0, max(max(coverage_df['Coverage Rate (%)']), 95) * 1.1)
-            ax.set_xlabel('')
-        
-        # Add counts to legend
-        if param_name:
-            handles, labels = ax.get_legend_handles_labels()
-            new_labels = []
-            for method, label in zip(methods, method_labels):
-                if f'{method}_ci_covers' in valid_df.columns:
-                    count = valid_df[f'{method}_ci_covers'].count()
-                    new_labels.append(f"{label} (n={count})")
-                else:
-                    new_labels.append(label)
-            
-            # Replace legend with counts
-            if len(handles) >= len(methods):
-                ax.legend(handles[:len(methods)], new_labels, title="Method")
-        
-        # Add title and y-label
-        #ax.set_title(f'Linear Regression CI Coverage by {"Method" if not param_name else param_name.capitalize()}')
-        ax.set_ylabel('Coverage Rate (%)')
-        
-        # Add reference to the plot
-        fig.text(
-            0.01, 0.01, 
-            "Coverage rate = % of cases where true effect is within the linear regression CI",
-            fontsize=8, 
-            style='italic'
-        )
-        
-        # Add grid
-        ax.grid(True, linestyle='--', alpha=0.7)
-        
-        # Save if path is provided
-        if save_path:
-            os.makedirs(os.path.dirname(save_path), exist_ok=True)
-            plt.savefig(save_path, dpi=300, bbox_inches='tight')
-        
-        return fig
-
-# =====================================================================
-# CI Visualization
-# =====================================================================
-
-
-def analyze_linreg_ci_properties(df, param_name=None, save_path=None):
-    """
-    Analyze properties of linear regression confidence intervals across methods.
-    
-    Parameters
-    ----------
-    df : pandas.DataFrame
-        DataFrame containing study results with CI information
-    param_name : str, optional
-        Name of the parameter to group by
-    save_path : str, optional
-        Path to save the plots
-        
-    Returns
-    -------
-    tuple
-        (width_fig, coverage_fig, deviation_fig) - Generated figures
-    """
-    from matplotlib.gridspec import GridSpec
-    
-    # Define the methods to analyze
-    methods = ['true_graph', 'pcmci', 'bagged']
-    method_labels = ['True Graph', 'PCMCI', 'Bagged PCMCI']
-    
-    # Filter to only include rows with the necessary data
-    valid_df = df.dropna(subset=['true_effect']).copy()
-    
-    # Create figures
-    fig = plt.figure(figsize=(18, 12))
-    gs = GridSpec(2, 2, figure=fig)
-    ax1 = fig.add_subplot(gs[0, 0])  # CI Width
-    ax2 = fig.add_subplot(gs[0, 1])  # Coverage Rate
-    ax3 = fig.add_subplot(gs[1, :])  # True effect vs CI
-    
-    # Exit if no valid data
-    if len(valid_df) == 0:
-        for ax in [ax1, ax2, ax3]:
-            ax.text(0.5, 0.5, "No valid data with confidence intervals found", 
-                    ha='center', va='center', fontsize=14)
-        if save_path:
-            plt.savefig(save_path, dpi=300, bbox_inches='tight')
-        return fig, None, None
-    
-    # Calculate CI properties for each method
-    for method in methods:
-        lower_col = f'{method}_ci_lower'
-        upper_col = f'{method}_ci_upper'
-        
-        if lower_col in valid_df.columns and upper_col in valid_df.columns:
-            # Calculate CI width
-            valid_df[f'{method}_ci_width'] = valid_df[upper_col] - valid_df[lower_col]
-            
-            # Calculate coverage
-            valid_df[f'{method}_ci_covers'] = (
-                (valid_df['true_effect'] >= valid_df[lower_col]) & 
-                (valid_df['true_effect'] <= valid_df[upper_col])
-            )
-            
-            # Calculate deviation from center
-            valid_df[f'{method}_center'] = (valid_df[lower_col] + valid_df[upper_col]) / 2
-            valid_df[f'{method}_deviation'] = valid_df[f'{method}_center'] - valid_df['true_effect']
-    
-    #---------------------------------------
-    # PLOT 1: CI Width by Method/Parameter
-    #---------------------------------------
-    if param_name and param_name in valid_df.columns:
-        # Group by parameter value
-        param_values = sorted(valid_df['param_value'].unique())
-        
-        # Prepare data for width plot
-        width_data = []
-        for param_val in param_values:
-            subset = valid_df[valid_df['param_value'] == param_val]
-            
-            for method, label in zip(methods, method_labels):
-                width_col = f'{method}_ci_width'
-                if width_col in subset.columns:
-                    width_data.append({
-                        'param_value': param_val,
-                        'Method': label,
-                        'CI Width': subset[width_col].mean()
-                    })
-        
-        # Convert to DataFrame for plotting
-        width_df = pd.DataFrame(width_data)
-        
-        # Create line plot for CI width
-        sns.lineplot(
-            data=width_df,
-            x='param_value',
-            y='CI Width',
-            hue='Method',
-            marker='o',
-            ax=ax1
-        )
-        
-        ax1.set_xlabel(f'{param_name.capitalize()} Value')
-        
-    else:
-        # Calculate average CI width by method
-        width_data = []
-        for method, label in zip(methods, method_labels):
-            width_col = f'{method}_ci_width'
-            if width_col in valid_df.columns:
-                width_data.append({
-                    'Method': label,
-                    'CI Width': valid_df[width_col].mean()
-                })
-        
-        # Convert to DataFrame
-        width_df = pd.DataFrame(width_data)
-        
-        # Create bar plot for CI width
-        sns.barplot(
-            data=width_df,
-            x='Method',
-            y='CI Width',
-            ax=ax1
-        )
-        
-        # Add value labels
-        for i, p in enumerate(ax1.patches):
-            ax1.annotate(
-                f'{p.get_height():.3f}',
-                (p.get_x() + p.get_width() / 2., p.get_height()),
-                ha='center', va='bottom'
-            )
-    
-    #ax1.set_title('Average Linear Regression CI Width')
-    ax1.grid(True, linestyle='--', alpha=0.7)
-    
-    #---------------------------------------
-    # PLOT 2: Coverage Rate
-    #---------------------------------------
-    # Prepare data for coverage plot
-    if param_name and param_name in valid_df.columns:
-        coverage_data = []
-        for param_val in param_values:
-            subset = valid_df[valid_df['param_value'] == param_val]
-            
-            for method, label in zip(methods, method_labels):
-                covers_col = f'{method}_ci_covers'
-                if covers_col in subset.columns:
-                    coverage_data.append({
-                        'param_value': param_val,
-                        'Method': label,
-                        'Coverage Rate (%)': subset[covers_col].mean() * 100
-                    })
-        
-        # Convert to DataFrame
-        coverage_df = pd.DataFrame(coverage_data)
-        
-        # Create line plot for coverage
-        sns.lineplot(
-            data=coverage_df,
-            x='param_value',
-            y='Coverage Rate (%)',
-            hue='Method',
-            marker='o',
-            ax=ax2
-        )
-        
-        ax2.set_xlabel(f'{param_name.capitalize()} Value')
-        
-    else:
-        # Calculate overall coverage by method
-        coverage_data = []
-        for method, label in zip(methods, method_labels):
-            covers_col = f'{method}_ci_covers'
-            if covers_col in valid_df.columns:
-                coverage_data.append({
-                    'Method': label,
-                    'Coverage Rate (%)': valid_df[covers_col].mean() * 100
-                })
-        
-        # Convert to DataFrame
-        coverage_df = pd.DataFrame(coverage_data)
-        
-        # Create bar plot for coverage
-        sns.barplot(
-            data=coverage_df,
-            x='Method',
-            y='Coverage Rate (%)',
-            ax=ax2
-        )
-        
-        # Add value labels
-        for i, p in enumerate(ax2.patches):
-            ax2.annotate(
-                f'{p.get_height():.1f}%',
-                (p.get_x() + p.get_width() / 2., p.get_height()),
-                ha='center', va='bottom'
-            )
-    
-    # Add the 95% reference line
-    ax2.axhline(y=95, color='gray', linestyle='--', alpha=0.7, label='95% Target')
-    ax2.set_title('Linear Regression CI Coverage Rate')
-    ax2.grid(True, linestyle='--', alpha=0.7)
-    
-    #---------------------------------------
-    # PLOT 3: True Effect vs CI
-    #---------------------------------------
-    # Select a subset of points to visualize if param_name is specified
-    if param_name and param_name in valid_df.columns:
-        # Choose representative points from different parameter values
-        sample_points = []
-        for param_val in param_values:
-            subset = valid_df[valid_df['param_value'] == param_val]
-            if len(subset) > 0:
-                # Take one sample from each parameter value
-                sample_points.append(subset.iloc[0])
-        
-        # Convert to DataFrame
-        sample_df = pd.DataFrame(sample_points)
-    else:
-        # Randomly sample points for visualization
-        sample_size = min(20, len(valid_df))
-        sample_df = valid_df.sample(n=sample_size)
-    
-    # Prepare data for visualization
-    visualization_data = []
-    
-    for i, row in sample_df.iterrows():
-        true_effect = row['true_effect']
-        
-        for method, label in zip(methods, method_labels):
-            lower_col = f'{method}_ci_lower'
-            upper_col = f'{method}_ci_upper'
-            
-            if lower_col in row and upper_col in row:
-                ci_lower = row[lower_col]
-                ci_upper = row[upper_col]
-                
-                if not (np.isnan(ci_lower) or np.isnan(ci_upper)):
-                    visualization_data.append({
-                        'Method': label,
-                        'True Effect': true_effect,
-                        'CI Lower': ci_lower,
-                        'CI Upper': ci_upper,
-                        'Covers': (true_effect >= ci_lower) and (true_effect <= ci_upper)
-                    })
-    
-    # Convert to DataFrame
-    vis_df = pd.DataFrame(visualization_data)
-    
-    if len(vis_df) > 0:
-        # Add index for x-axis
-        methods_count = len(methods)
-        vis_df['Sample'] = np.repeat(range(len(vis_df) // methods_count), methods_count)
-        
-        # Sort for better visualization
-        vis_df = vis_df.sort_values(['Sample', 'Method'])
-        
-        # Jitter points by method
-        method_offset = {method: i * 0.2 - 0.2 for i, method in enumerate(method_labels)}
-        vis_df['x_pos'] = vis_df.apply(lambda row: row['Sample'] + method_offset[row['Method']], axis=1)
-        
-        # Plot true effects
-        samples = vis_df['Sample'].unique()
-        for sample in samples:
-            sample_true = vis_df[vis_df['Sample'] == sample]['True Effect'].iloc[0]
-            ax3.plot([sample - 0.3, sample + 0.3], [sample_true, sample_true], 'k-', alpha=0.5)
-        
-        # Plot CIs for each method
-        for method, label in zip(method_labels, ['b', 'g', 'r']):
-            method_df = vis_df[vis_df['Method'] == method]
-            
-            # Plot CIs
-            for i, row in method_df.iterrows():
-                color = label if row['Covers'] else 'gray'
-                ax3.plot([row['x_pos'], row['x_pos']], [row['CI Lower'], row['CI Upper']], 
-                         color=color, marker='_', linestyle='-', alpha=0.7,
-                         label=method if i == method_df.index[0] else "")
-        
-        # Improve plot appearance
-        ax3.set_xticks(samples)
-        if param_name and param_name in valid_df.columns:
-            ax3.set_xticklabels([f"{param_name}={val}" for val in param_values[:len(samples)]])
-        else:
-            ax3.set_xticklabels([f"Sample {i+1}" for i in range(len(samples))])
-        
-        ax3.set_title('Confidence Intervals Around True Effects')
-        ax3.set_ylabel('Effect Value')
-        ax3.grid(True, linestyle='--', alpha=0.3)
-        
-        # Add legend
-        handles, labels = [], []
-        for i, (method, color) in enumerate(zip(method_labels, ['b', 'g', 'r'])):
-            handles.append(plt.Line2D([0], [0], color=color, marker='_', linestyle='-', alpha=0.7))
-            labels.append(method)
-        
-        # Add line for true effect
-        handles.append(plt.Line2D([0], [0], color='k', linestyle='-', alpha=0.5))
-        labels.append('True Effect')
-        
-        ax3.legend(handles, labels, loc='upper right')
-    else:
-        ax3.text(0.5, 0.5, "Insufficient data for CI visualization", 
-                ha='center', va='center', fontsize=14)
-    
-    # Add descriptive text
-    fig.suptitle('Linear Regression Confidence Interval Analysis', fontsize=16)
-    fig.text(
-        0.01, 0.01, 
-        "CI = Confidence Interval   |   Coverage Rate = % of cases where true effect is within CI",
-        fontsize=8, 
-        style='italic'
-    )
-    
-    plt.tight_layout(rect=[0, 0.03, 1, 0.97])
-    
-    # Save if path is provided
-    if save_path:
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        plt.savefig(save_path, dpi=300, bbox_inches='tight')
-    
-    return fig
-
-def plot_error_vs_ci_width(df, param_name=None, save_path=None):
-    """
-    Plot relationship between estimation error and CI width across methods.
-    
-    Parameters
-    ----------
-    df : pandas.DataFrame
-        DataFrame containing study results with error and CI information
-    param_name : str, optional
-        Name of the parameter to color by
-    save_path : str, optional
-        Path to save the plot
-        
-    Returns
-    -------
-    matplotlib.figure.Figure
-        The generated figure
-    """
-
-    from matplotlib.colors import LinearSegmentedColormap
-    
-    # Set up figure
-    fig, axes = plt.subplots(1, 3, figsize=(18, 6))
-    
-    # Define the methods to analyze
-    methods = ['true_graph', 'pcmci', 'bagged']
-    method_labels = ['True Graph', 'PCMCI', 'Bagged PCMCI']
-    
-    # Filter to only include rows with the necessary data
-    valid_df = df.dropna(subset=['true_effect']).copy()
-    
-    # Exit if no valid data
-    if len(valid_df) == 0:
-        for ax in axes:
-            ax.text(0.5, 0.5, "No valid data with confidence intervals found", 
-                    ha='center', va='center', fontsize=14)
-        if save_path:
-            plt.savefig(save_path, dpi=300, bbox_inches='tight')
-        return fig
-    
-    # Calculate CI properties for each method
-    for method in methods:
-        lower_col = f'{method}_ci_lower'
-        upper_col = f'{method}_ci_upper'
-        effect_col = f'{method}_effect'
-        
-        if (lower_col in valid_df.columns and upper_col in valid_df.columns 
-            and effect_col in valid_df.columns):
-            # Calculate CI width
-            valid_df[f'{method}_ci_width'] = valid_df[upper_col] - valid_df[lower_col]
-            
-            # Calculate absolute error
-            valid_df[f'{method}_error'] = np.abs(valid_df[effect_col] - valid_df['true_effect'])
-            
-            # Calculate coverage
-            valid_df[f'{method}_ci_covers'] = (
-                (valid_df['true_effect'] >= valid_df[lower_col]) & 
-                (valid_df['true_effect'] <= valid_df[upper_col])
-            )
-    
-    # Create custom colormap for coverage (red for not covered, green for covered)
-    cmap = LinearSegmentedColormap.from_list('coverage', ['#ff6b6b', '#88e986'])
-    
-    # Plot for each method
-    for i, (method, label) in enumerate(zip(methods, method_labels)):
-        ax = axes[i]
-        
-        width_col = f'{method}_ci_width'
-        error_col = f'{method}_error'
-        covers_col = f'{method}_ci_covers'
-        
-        if all(col in valid_df.columns for col in [width_col, error_col, covers_col]):
-            # Create dataframe for this method with non-NaN values
-            method_df = valid_df.dropna(subset=[width_col, error_col, covers_col])
-            
-            if len(method_df) > 0:
-                # Plot error vs width, colored by coverage
-                if param_name and param_name in method_df.columns:
-                    # Color by parameter value
-                    scatter = ax.scatter(
-                        method_df[width_col],
-                        method_df[error_col],
-                        c=method_df['param_value'],
-                        cmap='viridis',
-                        alpha=0.7,
-                        s=50,
-                        edgecolors='w',
-                        linewidths=0.5
-                    )
-                    
-                    # Add colorbar
-                    cbar = plt.colorbar(scatter, ax=ax)
-                    cbar.set_label(f'{param_name.capitalize()} Value')
-                    
-                    # Add markers for coverage
-                    covered = method_df[method_df[covers_col] == True]
-                    not_covered = method_df[method_df[covers_col] == False]
-                    
-                    if len(covered) > 0:
-                        ax.scatter(
-                            covered[width_col],
-                            covered[error_col],
-                            s=80,
-                            facecolors='none',
-                            edgecolors='g',
-                            linewidths=1.5,
-                            label='Covered'
-                        )
-                    
-                    if len(not_covered) > 0:
-                        ax.scatter(
-                            not_covered[width_col],
-                            not_covered[error_col],
-                            s=80,
-                            facecolors='none',
-                            edgecolors='r',
-                            linewidths=1.5,
-                            label='Not Covered'
-                        )
-                    
-                else:
-                    # Color by coverage
-                    scatter = ax.scatter(
-                        method_df[width_col],
-                        method_df[error_col],
-                        c=method_df[covers_col],
-                        cmap=cmap,
-                        alpha=0.7,
-                        s=50
-                    )
-                    
-                    # Add legend for coverage
-                    legend_elements = [
-                        plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='#ff6b6b', 
-                                   markersize=10, label='Not Covered'),
-                        plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='#88e986', 
-                                   markersize=10, label='Covered')
-                    ]
-                    ax.legend(handles=legend_elements)
-                
-                # Add diagonal line (width = 2*error)
-                max_val = max(method_df[width_col].max(), method_df[error_col].max() * 2)
-                diag_x = np.linspace(0, max_val, 100)
-                ax.plot(diag_x, diag_x/2, 'k--', alpha=0.5, label='Width = 2×Error')
-                
-                # Add reference line for coverage
-                mean_width = method_df[width_col].mean()
-                ax.axvline(mean_width, color='gray', linestyle=':', alpha=0.7, 
-                          label=f'Mean Width: {mean_width:.4f}')
-                
-                # Calculate correlation
-                corr = method_df[width_col].corr(method_df[error_col])
-                coverage_rate = method_df[covers_col].mean() * 100
-                
-                # Add correlation and coverage info
-                ax.text(
-                    0.05, 0.95,
-                    f"Correlation: {corr:.2f}\nCoverage: {coverage_rate:.1f}%",
-                    transform=ax.transAxes,
-                    verticalalignment='top',
-                    bbox=dict(boxstyle='round', facecolor='white', alpha=0.8)
-                )
-                
-                # Set axis labels
-                ax.set_xlabel('Confidence Interval Width')
-                ax.set_ylabel('Absolute Error')
-                #ax.set_title(f'{label}')
-                
-                # Make axes start at 0
-                ax.set_xlim(0, None)
-                ax.set_ylim(0, None)
-                
-                # Add grid
-                ax.grid(True, linestyle='--', alpha=0.3)
-                
-            else:
-                ax.text(0.5, 0.5, f"No valid data for {label}", 
-                        ha='center', va='center', fontsize=14)
-        else:
-            ax.text(0.5, 0.5, f"Missing data for {label}", 
-                    ha='center', va='center', fontsize=14)
-    
-    # Add overall title
-    fig.suptitle('Relationship Between Estimation Error and CI Width', fontsize=16)
-    
-    # Add descriptive text
-    fig.text(
-        0.01, 0.01, 
-        "Ideally, CI width should be approximately 2× the error for proper coverage. Points below the diagonal line have wider CIs than needed, "
-        "points above have narrower CIs than needed for error magnitude.",
-        fontsize=8, 
-        style='italic'
-    )
-    
-    plt.tight_layout(rect=[0, 0.03, 1, 0.97])
     
     # Save if path is provided
     if save_path:
@@ -1923,10 +1266,9 @@ def plot_pipeline_timing_by_T(df, save_path=None):
     
     return fig
 
-
-def plot_bootstrap_timing_by_n_boot(df, save_path=None):
+def plot_pipeline_timing_by_B(df, save_path=None):
     """
-    Plot computation time comparison for bootstrap-based methods by number of bootstrap samples.
+    Plot full computation time comparison between pipelines based on Bootstrap replicas.
     
     Parameters
     ----------
@@ -1946,84 +1288,72 @@ def plot_bootstrap_timing_by_n_boot(df, save_path=None):
     import numpy as np
     import os
     
-    # Filter data for n_boot study
-    n_boot_df = df[df['param_name'] == 'n'].copy()
+    # Filter data for T study
+    B_df = df[df['param_name'] == 'B'].copy()
     
-    if len(n_boot_df) == 0:
+    if len(B_df) == 0:
         fig, ax = plt.subplots(figsize=(10, 6))
-        ax.text(0.5, 0.5, "No data for n_boot parameter study", 
+        ax.text(0.5, 0.5, "No data for B parameter study", 
                 ha='center', va='center', fontsize=14)
         if save_path:
             plt.savefig(save_path, dpi=300, bbox_inches='tight')
         return fig
     
-    # Sort by n_boot value
-    n_boot_values = sorted(n_boot_df['param_value'].unique())
+    # Sort by B value
+    B_values = sorted(B_df['param_value'].unique())
     
-    # Calculate bootstrap-based pipeline times
-    bootstrap_times = []
+    # Calculate total pipeline times
+    pipeline_times = []
     
-    for n_boot_val in n_boot_values:
-        subset = n_boot_df[n_boot_df['param_value'] == n_boot_val]
+    for B_val in B_values:
+        subset = B_df[B_df['param_value'] == B_val]
         
-        # Pipeline 2: Bagged PCMCI → Effect estimation (excluding PCMCI time)
-        bagged_time = subset['discovery_bootstrap_time'].mean() + subset['effect_bagged_effect_time'].mean()
+        # Calculate average times for each pipeline
+        # Pipeline 1: PCMCI → Effect estimation
+        pcmci_time = subset['discovery_pcmci_time'].mean() + subset['effect_pcmci_effect_time'].mean()
         
-        # Pipeline 3: Bootstrap PCMCI → Effect estimation for all replicas (excluding PCMCI time)
-        bootstrap_time = subset['discovery_bootstrap_time'].mean() + subset['effect_bootstrap_effects_time'].mean()
+        # Pipeline 2: Bagged PCMCI → Effect estimation
+        bagged_time = subset['discovery_pcmci_time'].mean() + subset['discovery_bootstrap_time'].mean() + subset['effect_bagged_effect_time'].mean()
         
-        # Add to list
-        bootstrap_times.append({
-            'n_boot': n_boot_val,
+        # Pipeline 3: Bootstrap PCMCI → Effect estimation for all replicas
+        bootstrap_time = subset['discovery_pcmci_time'].mean() + subset['discovery_bootstrap_time'].mean() + subset['effect_bootstrap_effects_time'].mean()
+        
+        pipeline_times.append({
+            'B': B_val,
+            'PCMCI → Effect': pcmci_time,
             'Bagged PCMCI → Effect': bagged_time,
             'Bootstrap PCMCI → Effect': bootstrap_time
         })
     
     # Convert to DataFrame for plotting
-    plot_df = pd.DataFrame(bootstrap_times)
+    plot_df = pd.DataFrame(pipeline_times)
     
     # Create plot
     fig, ax = plt.subplots(figsize=(10, 6))
     
     # Melt DataFrame for seaborn
-    melted_df = pd.melt(plot_df, id_vars=['n_boot'], 
-                        value_vars=['Bagged PCMCI → Effect', 'Bootstrap PCMCI → Effect'],
-                        var_name='Pipeline', value_name='Time (seconds)')
+    melted_df = pd.melt(plot_df, id_vars=['B'], 
+                        value_vars=['PCMCI → Effect', 'Bagged PCMCI → Effect', 'Bootstrap PCMCI → Effect'],
+                        var_name='Pipeline', value_name='Bootstrap Replicas')
     
-    # Create plot
-    sns.lineplot(data=melted_df, x='n_boot', y='Time (seconds)', hue='Pipeline', 
-                marker='o', ax=ax)
+    # Create plot with log scale
+    sns.lineplot(data=melted_df, x='B', y='Bootstrap Replicas', hue='Pipeline', 
+                marker='o', ax=ax, palette = METHOD_COLORS)
     
-    # Add polynomial trend lines
-    for pipeline in ['Bagged PCMCI → Effect', 'Bootstrap PCMCI → Effect']:
-        pipeline_data = melted_df[melted_df['Pipeline'] == pipeline]
-        x = pipeline_data['n_boot']
-        y = pipeline_data['Time (seconds)']
-        
-        # Fit polynomial regression (degree=1 for linear relationship with n_boot)
-        z = np.polyfit(x, y, 1)
-        p = np.poly1d(z)
-        
-        # Add trend line
-        x_trend = np.linspace(min(x), max(x), 100)
-        ax.plot(x_trend, p(x_trend), linestyle='--', alpha=0.7)
+    # Set log scale for better visualization
+    ax.set_yscale('log')
+    #ax.set_xscale('log')
     
     # Add labels and title
-    ax.set_xlabel('Number of Bootstrap Samples (n_boot)')
-    ax.set_ylabel('Computation Time (seconds)')
-    #ax.set_title('Bootstrap-Based Methods Computation Time by Number of Bootstrap Samples')
+    ax.set_xlabel('Bootstrap Replicas (B)')
+    ax.set_ylabel('Computation Time (seconds, log scale)')
     
     # Improve x-axis
-    ax.set_xticks(n_boot_values)
+    #ax.set_xticks(B_values)
     ax.grid(True, alpha=0.3)
     
     # Add legend
     ax.legend(title='Pipeline', bbox_to_anchor=(0.5, 1.15), loc='upper center', ncol=3)
-    
-    # Add annotation about linear relationship
-    ax.text(0.05, 0.95, "Note: Dashed lines show linear trends", 
-           transform=ax.transAxes, fontsize=10, verticalalignment='top',
-           bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
     
     # Save if path is provided
     if save_path:
@@ -2031,6 +1361,8 @@ def plot_bootstrap_timing_by_n_boot(df, save_path=None):
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
     
     return fig
+
+
 
 def plot_improved_timing_analysis(df, save_path=None):
     """
@@ -2455,23 +1787,23 @@ def plot_bootstrap_distribution_with_methods(bootstrap_effects, true_effect=None
     #plt.plot(x, y, 'k-', linewidth=1.5, label='Density Estimate')
     
     # Add vertical lines for different methods
-    plt.axvline(mean, color='blue', linestyle='--', linewidth=2,
+    plt.axvline(mean, color=METHOD_COLORS['Bootstrap'], linestyle='-', linewidth=2,
                label=f'Bootstrap Mean: {mean:.4f}')
     
     if true_effect is not None and not np.isnan(true_effect):
-        plt.axvline(true_effect, color='red', linestyle='-', linewidth=2,
+        plt.axvline(true_effect, color=METHOD_COLORS['True Effect'], linestyle='--', linewidth=2,
                    label=f'True Effect: {true_effect:.4f}')
     
     if true_graph_effect is not None and not np.isnan(true_graph_effect):
-        plt.axvline(true_graph_effect, color='green', linestyle='-', linewidth=2,
+        plt.axvline(true_graph_effect, color=METHOD_COLORS['True_graph'], linestyle='-', linewidth=2,
                    label=f'True Graph: {true_graph_effect:.4f}')
     
     if pcmci_effect is not None and not np.isnan(pcmci_effect):
-        plt.axvline(pcmci_effect, color='orange', linestyle='-', linewidth=2,
+        plt.axvline(pcmci_effect, color=METHOD_COLORS['Pcmci'], linestyle='-', linewidth=2,
                    label=f'PCMCI: {pcmci_effect:.4f}')
     
     if bagged_effect is not None and not np.isnan(bagged_effect):
-        plt.axvline(bagged_effect, color='purple', linestyle='-', linewidth=2,
+        plt.axvline(bagged_effect, color=METHOD_COLORS['Bagged'], linestyle='-', linewidth=2,
                    label=f'Bagged: {bagged_effect:.4f}')
     
     # Add confidence interval
@@ -2479,7 +1811,7 @@ def plot_bootstrap_distribution_with_methods(bootstrap_effects, true_effect=None
                 label=f'95% CI: [{ci_lower:.4f}, {ci_upper:.4f}]')
     
     plt.xlabel('Effect Size')
-    plt.ylabel('Density')
+    plt.ylabel('Count')
     #plt.title(title if title else 'Bootstrap Effect Distribution with Method Comparison')
     plt.legend(bbox_to_anchor=(0.5, 1.15), loc='upper center', ncol=4)
     plt.grid(True)
@@ -2549,6 +1881,168 @@ def select_interesting_cases(df, param_name, min_value=None, med_value=None, max
 CI Visualization and Analysis Approaches for Bootstrap-Based Causal Effect Estimation
 """
 
+
+def plot_linreg_ci_coverage(df, param_name=None, save_path=None):
+    """
+    Plot coverage rate of linear regression confidence intervals across estimation methods.
+    
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame containing study results with confidence interval information
+    param_name : str, optional
+        Name of the parameter to group by (e.g., 'auto', 'cross', 'noise', 'T')
+    save_path : str, optional
+        Path to save the plot
+        
+    Returns
+    -------
+    matplotlib.figure.Figure
+        The generated figure
+    """
+    
+    # Set up figure
+    fig, ax = plt.subplots(figsize=(10, 6))
+    
+    # Define the methods to track
+    methods = ['true_graph_linreg', 'pcmci_linreg', 'bagged_linreg', 'bootstrap_combined', 'bootstrap_conservative','bootstrap']
+    method_labels = ['True Graph', 'PCMCI', 'Bagged PCMCI', 'Bootstrap Combined', 'Bootstrap Conservative', 'Bootstrap Distribution']
+    
+    # Filter to only include rows with the necessary data
+    required_cols = ['true_effect']
+    for method in methods:
+        required_cols.extend([f'{method}_ci_lower', f'{method}_ci_upper'])
+    
+    valid_df = df.dropna(subset=['true_effect']).copy()
+    
+    # Exit if no valid data
+    if len(valid_df) == 0:
+        ax.text(0.5, 0.5, "No valid data with confidence intervals found", 
+                ha='center', va='center', fontsize=14)
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        return fig
+    
+    # Calculate coverage for each method
+    for method in methods:
+        if f'{method}_ci_lower' in valid_df.columns and f'{method}_ci_upper' in valid_df.columns:
+            # Calculate whether true effect is within the CI
+            valid_df[f'{method}_ci_covers'] = (
+                (valid_df['true_effect'] >= valid_df[f'{method}_ci_lower']) & 
+                (valid_df['true_effect'] <= valid_df[f'{method}_ci_upper'])
+            )
+    
+    # Plotting logic depends on whether we're grouping by parameter
+    if param_name:
+        # Group by parameter value
+        param_values = sorted(valid_df['param_value'].unique())
+        
+        # Calculate coverage rate for each parameter value and method
+        coverage_data = []
+        
+        for param_val in param_values:
+            subset = valid_df[valid_df['param_value'] == param_val]
+            
+            for method, label in zip(methods, method_labels):
+                if f'{method}_ci_covers' in subset.columns:
+                    coverage = subset[f'{method}_ci_covers'].mean() * 100
+                    coverage_data.append({
+                        'param_value': param_val,
+                        'Method': label,
+                        'Coverage Rate (%)': coverage
+                    })
+        
+        # Convert to DataFrame for plotting
+        coverage_df = pd.DataFrame(coverage_data)
+        
+        # Create line plot
+        sns.lineplot(
+            data=coverage_df,
+            x='param_value',
+            y='Coverage Rate (%)',
+            hue='Method',
+            marker='o',
+            ax=ax
+        )
+        
+        # Add the 95% reference line
+        ax.axhline(y=95, color='gray', linestyle='--', alpha=0.7, label='95% Target')
+        
+        # Improve axis labels
+        ax.set_xlabel(f'{param_name} Value')
+        
+    else:
+        # Calculate overall coverage rates
+        coverage_data = []
+        
+        for method, label in zip(methods, method_labels):
+            if f'{method}_ci_covers' in valid_df.columns:
+                coverage = valid_df[f'{method}_ci_covers_true'].mean() * 100
+                coverage_data.append({
+                    'Method': label,
+                    'Coverage Rate (%)': coverage
+                })
+        
+        # Convert to DataFrame and sort by coverage rate
+        coverage_df = pd.DataFrame(coverage_data)
+        #coverage_df = coverage_df.sort_values('Coverage Rate (%)', ascending=False)
+
+        """
+        # Create bar plot
+        bars = ax.bar(
+            coverage_df['Method'],
+            coverage_df['Coverage Rate (%)'],
+            alpha=0.7,
+            color = [METHOD_COLORS[method] for method in coverage_df['Method']]
+        )
+        """
+
+        bars = []
+        for i, (method, rate) in enumerate(zip(coverage_df['Method'], coverage_df['Coverage Rate (%)'])):
+            bar = ax.bar(i, rate, alpha=0.7, color=METHOD_COLORS[method], label=method)
+            bars.append(bar[0])  # bar is a container with one rectangle, we need the rectangle
+        
+        # Add the 95% reference line
+        ax.axhline(y=95, color='gray', linestyle='--', alpha=0.7, label='95% Target')
+        
+        # Add value labels on bars
+        for i, bar in enumerate(bars):
+            height = bar.get_height()
+            ax.text(
+                bar.get_x() + bar.get_width()/2.,
+                height + 1,
+                f'{height:.1f}%',
+                ha='center',
+                va='bottom'
+            )
+        
+        # Improve axis
+        ax.set_ylim(0, max(max(coverage_df['Coverage Rate (%)']), 95) * 1.1)
+        ax.set_xticks([])
+        ax.set_xticklabels([])
+        ax.set_xlabel('')
+        ax.spines['bottom'].set_visible(False) 
+        ax.legend(bbox_to_anchor=(0.5, 1.15), loc='upper center', ncol=4)
+    
+
+    # Add title and y-label
+    #ax.set_title(f'Linear Regression CI Coverage by {"Method" if not param_name else param_name}')
+    ax.set_ylabel('Coverage Rate (%)')
+    
+
+    
+    # Add grid
+    ax.grid(True, linestyle='--', alpha=0.7)
+    
+    # Save if path is provided
+    if save_path:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    
+    return fig
+
+
+
 def plot_ci_width_comparison(df, param_name=None, effect_key=None, save_path=None):
     """
     Plot comparison of CI widths across methods, focusing on precision rather than coverage.
@@ -2566,6 +2060,10 @@ def plot_ci_width_comparison(df, param_name=None, effect_key=None, save_path=Non
     """
     # Filter data if needed
     plot_df = df.copy()
+
+    methods = ['true_graph_linreg', 'pcmci_linreg', 'bagged_linreg', 'bootstrap_combined', 'bootstrap_conservative','bootstrap_distribution']
+    method_labels = ['True Graph', 'PCMCI', 'Bagged PCMCI', 'Bootstrap Combined', 'Bootstrap Conservative', 'Bootstrap Distribution']
+
     if param_name is not None:
         plot_df = plot_df[plot_df['param_name'] == param_name]
     if effect_key is not None:
@@ -2636,10 +2134,22 @@ def plot_ci_width_comparison(df, param_name=None, effect_key=None, save_path=Non
             x='param_value', 
             y='ci_width', 
             hue='method',
+            hue_order=methods,
             marker='o',
+            palette=METHOD_COLORS,
             linewidth=2
         )
-        plt.xlabel(f'{param_name.capitalize()} Value')
+        plt.xlabel(f'{param_name} Value')
+
+        # Get handles and labels
+        handles, labels = plt.gca().get_legend_handles_labels()
+        
+        # Replace the labels with your dictionary names
+        new_labels = [METHOD_LABELS.get(label, label) for label in labels]
+        
+        # Create new legend with the mapped names
+        plt.legend(handles, new_labels, bbox_to_anchor=(0.5, 1.15), 
+                loc='upper center', ncol=3)
     else:
         # Bar plot for different methods
         sns.barplot(
@@ -2781,7 +2291,7 @@ def plot_ci_width_to_error_ratio(df, param_name=None, effect_key=None, save_path
             marker='o',
             linewidth=2
         )
-        plt.xlabel(f'{param_name.capitalize()} Value')
+        plt.xlabel(f'{param_name} Value')
     else:
         # Box plot for different methods
         sns.boxplot(
@@ -3004,15 +2514,15 @@ def plot_bootstrap_ci_scatter(df, param_values=None,  save_path=None,effect_key=
         
         # Add vertical line for true effect if available
         if true_effect is not None:
-            ax.axvline(x=true_effect, color='black', linestyle='--', 
+            ax.axvline(x=true_effect, color='red', linestyle='--', 
                       linewidth=2, label='True Effect')
         
         # Add vertical lines for different method estimates
         method_colors = {
-            'true_graph_effect': 'green',
-            'pcmci_effect': 'orange',
-            'bagged_effect': 'purple',
-            'bootstrap_mean': 'red'
+            'true_graph_effect': '#9c27b0',
+            'pcmci_effect': '#f57f17',
+            'bagged_effect': '#00897b',
+            'bootstrap_mean': '#1565c0'
         }
         
         for method, color in method_colors.items():
@@ -3021,10 +2531,11 @@ def plot_bootstrap_ci_scatter(df, param_values=None,  save_path=None,effect_key=
                           linewidth=1.5, label=f'{method.replace("_effect", "")}')
         
         # Add title and labels
-        #ax.set_title(f'Bootstrap Estimates with CIs (Param Value = {param_value})')
+        ax.set_title(f'{row.get("param_name")} = {param_value:.2f}')
         ax.set_xlabel('Effect Estimate')
         ax.set_ylabel('Bootstrap Replica')
-        ax.legend(bbox_to_anchor=(0.5, 1.15), loc='upper center', ncol=6)
+        if i == len(param_values):
+            ax.legend(bbox_to_anchor=(0.5, 1.15), loc='lower center', ncol=6)
         
         # Remove y-ticks
         ax.set_yticks([])
@@ -3036,7 +2547,7 @@ def plot_bootstrap_ci_scatter(df, param_values=None,  save_path=None,effect_key=
     title = 'Bootstrap Estimates with CIs'
     if effect_key:
         title += f' for {effect_key}'
-    fig.suptitle(title, fontsize=16)
+    #fig.suptitle(title, fontsize=16)
     
     plt.tight_layout(rect=[0, 0, 1, 0.97])
     
@@ -3114,7 +2625,7 @@ def plot_ci_success_rate(df, param_name=None, save_path=None):
             marker='o',
             linewidth=2
         )
-        plt.xlabel(f'{param_name.capitalize()} Value')
+        plt.xlabel(f'{param_name} Value')
     else:
         # Bar plot for different methods
         sns.barplot(
@@ -3257,6 +2768,528 @@ def plot_ci_distribution_comparison(df, param_value, effect_key=None, save_path=
 
 
 
+def analyze_linreg_ci_properties(df, param_name=None, save_path=None):
+    """
+    Analyze properties of linear regression confidence intervals across methods.
+    
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame containing study results with CI information
+    param_name : str, optional
+        Name of the parameter to group by
+    save_path : str, optional
+        Path to save the plots
+        
+    Returns
+    -------
+    tuple
+        (width_fig, coverage_fig, deviation_fig) - Generated figures
+    """
+    from matplotlib.gridspec import GridSpec
+    
+    # Define the methods to analyze
+    methods = ['true_graph', 'pcmci', 'bagged']
+    method_labels = ['True Graph', 'PCMCI', 'Bagged PCMCI']
+    
+    # Filter to only include rows with the necessary data
+    valid_df = df.dropna(subset=['true_effect']).copy()
+    
+    # Create figures
+    fig = plt.figure(figsize=(18, 12))
+    gs = GridSpec(2, 2, figure=fig)
+    ax1 = fig.add_subplot(gs[0, 0])  # CI Width
+    ax2 = fig.add_subplot(gs[0, 1])  # Coverage Rate
+    ax3 = fig.add_subplot(gs[1, :])  # True effect vs CI
+    
+    # Exit if no valid data
+    if len(valid_df) == 0:
+        for ax in [ax1, ax2, ax3]:
+            ax.text(0.5, 0.5, "No valid data with confidence intervals found", 
+                    ha='center', va='center', fontsize=14)
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        return fig, None, None
+    
+    # Calculate CI properties for each method
+    for method in methods:
+        lower_col = f'{method}_ci_lower'
+        upper_col = f'{method}_ci_upper'
+        
+        if lower_col in valid_df.columns and upper_col in valid_df.columns:
+            # Calculate CI width
+            valid_df[f'{method}_ci_width'] = valid_df[upper_col] - valid_df[lower_col]
+            
+            # Calculate coverage
+            valid_df[f'{method}_ci_covers'] = (
+                (valid_df['true_effect'] >= valid_df[lower_col]) & 
+                (valid_df['true_effect'] <= valid_df[upper_col])
+            )
+            
+            # Calculate deviation from center
+            valid_df[f'{method}_center'] = (valid_df[lower_col] + valid_df[upper_col]) / 2
+            valid_df[f'{method}_deviation'] = valid_df[f'{method}_center'] - valid_df['true_effect']
+    
+    #---------------------------------------
+    # PLOT 1: CI Width by Method/Parameter
+    #---------------------------------------
+    if param_name and param_name in valid_df.columns:
+        # Group by parameter value
+        param_values = sorted(valid_df['param_value'].unique())
+        
+        # Prepare data for width plot
+        width_data = []
+        for param_val in param_values:
+            subset = valid_df[valid_df['param_value'] == param_val]
+            
+            for method, label in zip(methods, method_labels):
+                width_col = f'{method}_ci_width'
+                if width_col in subset.columns:
+                    width_data.append({
+                        'param_value': param_val,
+                        'Method': label,
+                        'CI Width': subset[width_col].mean()
+                    })
+        
+        # Convert to DataFrame for plotting
+        width_df = pd.DataFrame(width_data)
+        
+        # Create line plot for CI width
+        sns.lineplot(
+            data=width_df,
+            x='param_value',
+            y='CI Width',
+            hue='Method',
+            marker='o',
+            ax=ax1
+        )
+        
+        ax1.set_xlabel(f'{param_name} Value')
+        
+    else:
+        # Calculate average CI width by method
+        width_data = []
+        for method, label in zip(methods, method_labels):
+            width_col = f'{method}_ci_width'
+            if width_col in valid_df.columns:
+                width_data.append({
+                    'Method': label,
+                    'CI Width': valid_df[width_col].mean()
+                })
+        
+        # Convert to DataFrame
+        width_df = pd.DataFrame(width_data)
+        
+        # Create bar plot for CI width
+        sns.barplot(
+            data=width_df,
+            x='Method',
+            y='CI Width',
+            ax=ax1
+        )
+        
+        # Add value labels
+        for i, p in enumerate(ax1.patches):
+            ax1.annotate(
+                f'{p.get_height():.3f}',
+                (p.get_x() + p.get_width() / 2., p.get_height()),
+                ha='center', va='bottom'
+            )
+    
+    #ax1.set_title('Average Linear Regression CI Width')
+    ax1.grid(True, linestyle='--', alpha=0.7)
+    
+    #---------------------------------------
+    # PLOT 2: Coverage Rate
+    #---------------------------------------
+    # Prepare data for coverage plot
+    if param_name and param_name in valid_df.columns:
+        coverage_data = []
+        for param_val in param_values:
+            subset = valid_df[valid_df['param_value'] == param_val]
+            
+            for method, label in zip(methods, method_labels):
+                covers_col = f'{method}_ci_covers'
+                if covers_col in subset.columns:
+                    coverage_data.append({
+                        'param_value': param_val,
+                        'Method': label,
+                        'Coverage Rate (%)': subset[covers_col].mean() * 100
+                    })
+        
+        # Convert to DataFrame
+        coverage_df = pd.DataFrame(coverage_data)
+        
+        # Create line plot for coverage
+        sns.lineplot(
+            data=coverage_df,
+            x='param_value',
+            y='Coverage Rate (%)',
+            hue='Method',
+            marker='o',
+            ax=ax2
+        )
+        
+        ax2.set_xlabel(f'{param_name} Value')
+        
+    else:
+        # Calculate overall coverage by method
+        coverage_data = []
+        for method, label in zip(methods, method_labels):
+            covers_col = f'{method}_ci_covers'
+            if covers_col in valid_df.columns:
+                coverage_data.append({
+                    'Method': label,
+                    'Coverage Rate (%)': valid_df[covers_col].mean() * 100
+                })
+        
+        # Convert to DataFrame
+        coverage_df = pd.DataFrame(coverage_data)
+        
+        # Create bar plot for coverage
+        sns.barplot(
+            data=coverage_df,
+            x='Method',
+            y='Coverage Rate (%)',
+            ax=ax2
+        )
+        
+        # Add value labels
+        for i, p in enumerate(ax2.patches):
+            ax2.annotate(
+                f'{p.get_height():.1f}%',
+                (p.get_x() + p.get_width() / 2., p.get_height()),
+                ha='center', va='bottom'
+            )
+    
+    # Add the 95% reference line
+    ax2.axhline(y=95, color='gray', linestyle='--', alpha=0.7, label='95% Target')
+    ax2.set_title('Linear Regression CI Coverage Rate')
+    ax2.grid(True, linestyle='--', alpha=0.7)
+    
+    #---------------------------------------
+    # PLOT 3: True Effect vs CI
+    #---------------------------------------
+    # Select a subset of points to visualize if param_name is specified
+    if param_name and param_name in valid_df.columns:
+        # Choose representative points from different parameter values
+        sample_points = []
+        for param_val in param_values:
+            subset = valid_df[valid_df['param_value'] == param_val]
+            if len(subset) > 0:
+                # Take one sample from each parameter value
+                sample_points.append(subset.iloc[0])
+        
+        # Convert to DataFrame
+        sample_df = pd.DataFrame(sample_points)
+    else:
+        # Randomly sample points for visualization
+        sample_size = min(20, len(valid_df))
+        sample_df = valid_df.sample(n=sample_size)
+    
+    # Prepare data for visualization
+    visualization_data = []
+    
+    for i, row in sample_df.iterrows():
+        true_effect = row['true_effect']
+        
+        for method, label in zip(methods, method_labels):
+            lower_col = f'{method}_ci_lower'
+            upper_col = f'{method}_ci_upper'
+            
+            if lower_col in row and upper_col in row:
+                ci_lower = row[lower_col]
+                ci_upper = row[upper_col]
+                
+                if not (np.isnan(ci_lower) or np.isnan(ci_upper)):
+                    visualization_data.append({
+                        'Method': label,
+                        'True Effect': true_effect,
+                        'CI Lower': ci_lower,
+                        'CI Upper': ci_upper,
+                        'Covers': (true_effect >= ci_lower) and (true_effect <= ci_upper)
+                    })
+    
+    # Convert to DataFrame
+    vis_df = pd.DataFrame(visualization_data)
+    
+    if len(vis_df) > 0:
+        # Add index for x-axis
+        methods_count = len(methods)
+        vis_df['Sample'] = np.repeat(range(len(vis_df) // methods_count), methods_count)
+        
+        # Sort for better visualization
+        vis_df = vis_df.sort_values(['Sample', 'Method'])
+        
+        # Jitter points by method
+        method_offset = {method: i * 0.2 - 0.2 for i, method in enumerate(method_labels)}
+        vis_df['x_pos'] = vis_df.apply(lambda row: row['Sample'] + method_offset[row['Method']], axis=1)
+        
+        # Plot true effects
+        samples = vis_df['Sample'].unique()
+        for sample in samples:
+            sample_true = vis_df[vis_df['Sample'] == sample]['True Effect'].iloc[0]
+            ax3.plot([sample - 0.3, sample + 0.3], [sample_true, sample_true], 'k-', alpha=0.5)
+        
+        # Plot CIs for each method
+        for method, label in zip(method_labels, ['b', 'g', 'r']):
+            method_df = vis_df[vis_df['Method'] == method]
+            
+            # Plot CIs
+            for i, row in method_df.iterrows():
+                color = label if row['Covers'] else 'gray'
+                ax3.plot([row['x_pos'], row['x_pos']], [row['CI Lower'], row['CI Upper']], 
+                         color=color, marker='_', linestyle='-', alpha=0.7,
+                         label=method if i == method_df.index[0] else "")
+        
+        # Improve plot appearance
+        ax3.set_xticks(samples)
+        if param_name and param_name in valid_df.columns:
+            ax3.set_xticklabels([f"{param_name}={val}" for val in param_values[:len(samples)]])
+        else:
+            ax3.set_xticklabels([f"Sample {i+1}" for i in range(len(samples))])
+        
+        ax3.set_title('Confidence Intervals Around True Effects')
+        ax3.set_ylabel('Effect Value')
+        ax3.grid(True, linestyle='--', alpha=0.3)
+        
+        # Add legend
+        handles, labels = [], []
+        for i, (method, color) in enumerate(zip(method_labels, ['b', 'g', 'r'])):
+            handles.append(plt.Line2D([0], [0], color=color, marker='_', linestyle='-', alpha=0.7))
+            labels.append(method)
+        
+        # Add line for true effect
+        handles.append(plt.Line2D([0], [0], color='k', linestyle='-', alpha=0.5))
+        labels.append('True Effect')
+        
+        ax3.legend(handles, labels, loc='upper right')
+    else:
+        ax3.text(0.5, 0.5, "Insufficient data for CI visualization", 
+                ha='center', va='center', fontsize=14)
+    
+    # Add descriptive text
+    fig.suptitle('Linear Regression Confidence Interval Analysis', fontsize=16)
+    fig.text(
+        0.01, 0.01, 
+        "CI = Confidence Interval   |   Coverage Rate = % of cases where true effect is within CI",
+        fontsize=8, 
+        style='italic'
+    )
+    
+    plt.tight_layout(rect=[0, 0.03, 1, 0.97])
+    
+    # Save if path is provided
+    if save_path:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    
+    return fig
+
+def plot_error_vs_ci_width(df, param_name=None, save_path=None):
+    """
+    Plot relationship between estimation error and CI width across methods.
+    
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame containing study results with error and CI information
+    param_name : str, optional
+        Name of the parameter to color by
+    save_path : str, optional
+        Path to save the plot
+        
+    Returns
+    -------
+    matplotlib.figure.Figure
+        The generated figure
+    """
+
+    from matplotlib.colors import LinearSegmentedColormap
+    
+    # Set up figure
+    fig, axes = plt.subplots(1, 3, figsize=(18, 6))
+    
+    # Define the methods to analyze
+    methods = ['true_graph', 'pcmci', 'bagged']
+    method_labels = ['True Graph', 'PCMCI', 'Bagged PCMCI']
+    
+    # Filter to only include rows with the necessary data
+    valid_df = df.dropna(subset=['true_effect']).copy()
+    
+    # Exit if no valid data
+    if len(valid_df) == 0:
+        for ax in axes:
+            ax.text(0.5, 0.5, "No valid data with confidence intervals found", 
+                    ha='center', va='center', fontsize=14)
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        return fig
+    
+    # Calculate CI properties for each method
+    for method in methods:
+        lower_col = f'{method}_ci_lower'
+        upper_col = f'{method}_ci_upper'
+        effect_col = f'{method}_effect'
+        
+        if (lower_col in valid_df.columns and upper_col in valid_df.columns 
+            and effect_col in valid_df.columns):
+            # Calculate CI width
+            valid_df[f'{method}_ci_width'] = valid_df[upper_col] - valid_df[lower_col]
+            
+            # Calculate absolute error
+            valid_df[f'{method}_error'] = np.abs(valid_df[effect_col] - valid_df['true_effect'])
+            
+            # Calculate coverage
+            valid_df[f'{method}_ci_covers'] = (
+                (valid_df['true_effect'] >= valid_df[lower_col]) & 
+                (valid_df['true_effect'] <= valid_df[upper_col])
+            )
+    
+    # Create custom colormap for coverage (red for not covered, green for covered)
+    cmap = LinearSegmentedColormap.from_list('coverage', ['#ff6b6b', '#88e986'])
+    
+    # Plot for each method
+    for i, (method, label) in enumerate(zip(methods, method_labels)):
+        ax = axes[i]
+        
+        width_col = f'{method}_ci_width'
+        error_col = f'{method}_error'
+        covers_col = f'{method}_ci_covers'
+        
+        if all(col in valid_df.columns for col in [width_col, error_col, covers_col]):
+            # Create dataframe for this method with non-NaN values
+            method_df = valid_df.dropna(subset=[width_col, error_col, covers_col])
+            
+            if len(method_df) > 0:
+                # Plot error vs width, colored by coverage
+                if param_name and param_name in method_df.columns:
+                    # Color by parameter value
+                    scatter = ax.scatter(
+                        method_df[width_col],
+                        method_df[error_col],
+                        c=method_df['param_value'],
+                        cmap='viridis',
+                        alpha=0.7,
+                        s=50,
+                        edgecolors='w',
+                        linewidths=0.5
+                    )
+                    
+                    # Add colorbar
+                    cbar = plt.colorbar(scatter, ax=ax)
+                    cbar.set_label(f'{param_name} Value')
+                    
+                    # Add markers for coverage
+                    covered = method_df[method_df[covers_col] == True]
+                    not_covered = method_df[method_df[covers_col] == False]
+                    
+                    if len(covered) > 0:
+                        ax.scatter(
+                            covered[width_col],
+                            covered[error_col],
+                            s=80,
+                            facecolors='none',
+                            edgecolors='g',
+                            linewidths=1.5,
+                            label='Covered'
+                        )
+                    
+                    if len(not_covered) > 0:
+                        ax.scatter(
+                            not_covered[width_col],
+                            not_covered[error_col],
+                            s=80,
+                            facecolors='none',
+                            edgecolors='r',
+                            linewidths=1.5,
+                            label='Not Covered'
+                        )
+                    
+                else:
+                    # Color by coverage
+                    scatter = ax.scatter(
+                        method_df[width_col],
+                        method_df[error_col],
+                        c=method_df[covers_col],
+                        cmap=cmap,
+                        alpha=0.7,
+                        s=50
+                    )
+                    
+                    # Add legend for coverage
+                    legend_elements = [
+                        plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='#ff6b6b', 
+                                   markersize=10, label='Not Covered'),
+                        plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='#88e986', 
+                                   markersize=10, label='Covered')
+                    ]
+                    ax.legend(handles=legend_elements)
+                
+                # Add diagonal line (width = 2*error)
+                max_val = max(method_df[width_col].max(), method_df[error_col].max() * 2)
+                diag_x = np.linspace(0, max_val, 100)
+                ax.plot(diag_x, diag_x/2, 'k--', alpha=0.5, label='Width = 2×Error')
+                
+                # Add reference line for coverage
+                mean_width = method_df[width_col].mean()
+                ax.axvline(mean_width, color='gray', linestyle=':', alpha=0.7, 
+                          label=f'Mean Width: {mean_width:.4f}')
+                
+                # Calculate correlation
+                corr = method_df[width_col].corr(method_df[error_col])
+                coverage_rate = method_df[covers_col].mean() * 100
+                
+                # Add correlation and coverage info
+                ax.text(
+                    0.05, 0.95,
+                    f"Correlation: {corr:.2f}\nCoverage: {coverage_rate:.1f}%",
+                    transform=ax.transAxes,
+                    verticalalignment='top',
+                    bbox=dict(boxstyle='round', facecolor='white', alpha=0.8)
+                )
+                
+                # Set axis labels
+                ax.set_xlabel('Confidence Interval Width')
+                ax.set_ylabel('Absolute Error')
+                #ax.set_title(f'{label}')
+                
+                # Make axes start at 0
+                ax.set_xlim(0, None)
+                ax.set_ylim(0, None)
+                
+                # Add grid
+                ax.grid(True, linestyle='--', alpha=0.3)
+                
+            else:
+                ax.text(0.5, 0.5, f"No valid data for {label}", 
+                        ha='center', va='center', fontsize=14)
+        else:
+            ax.text(0.5, 0.5, f"Missing data for {label}", 
+                    ha='center', va='center', fontsize=14)
+    
+    # Add overall title
+    fig.suptitle('Relationship Between Estimation Error and CI Width', fontsize=16)
+    
+    # Add descriptive text
+    fig.text(
+        0.01, 0.01, 
+        "Ideally, CI width should be approximately 2× the error for proper coverage. Points below the diagonal line have wider CIs than needed, "
+        "points above have narrower CIs than needed for error magnitude.",
+        fontsize=8, 
+        style='italic'
+    )
+    
+    plt.tight_layout(rect=[0, 0.03, 1, 0.97])
+    
+    # Save if path is provided
+    if save_path:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    
+    return fig
+
+
 # =====================================================================
 # Adjustment Visualization
 # =====================================================================
@@ -3316,9 +3349,9 @@ def plot_adjustment_sets(df, param_name, save_path=None):
         ax.errorbar(param_values, means, yerr=stds, 
                    marker='o', label=method.capitalize(), linewidth=2, capsize=5)
     
-    ax.set_xlabel(f'{param_name.capitalize()} Value')
+    ax.set_xlabel(f'{param_name} Value')
     ax.set_ylabel('Adjustment Set Size')
-    #ax.set_title(f'Adjustment Set Size Comparison - {param_name.capitalize()}')
+    #ax.set_title(f'Adjustment Set Size Comparison - {param_name}')
     ax.legend(bbox_to_anchor=(0.5, 1.15), loc='upper center', ncol=len(methods))
     ax.grid(True)
     
@@ -3388,7 +3421,7 @@ def plot_adjustment_size_vs_error(analysis_df, method='bagged', param_name=None,
             
             # Add colorbar
             cbar = plt.colorbar(scatter, ax=ax)
-            cbar.set_label(f'{param_name.capitalize()} Value')
+            cbar.set_label(f'{param_name} Value')
         else:
             # If no parameter data, create simple scatter
             ax.scatter(plot_df[size_col], plot_df[error_col], alpha=0.7, s=50)
@@ -3613,8 +3646,8 @@ def plot_adjustment_set_stats(results_df, param_name=None, save_path=None):
         sns.lineplot(data=melt_df, x='param_value', y='Adjustment Set Size', 
                     hue='Method', marker='o', ax=ax,palette=METHOD_COLORS)
         
-        ax.set_xlabel(f'{param_name.capitalize()} Value')
-        #ax.set_title(f'Adjustment Set Size by {param_name.capitalize()} Value')
+        ax.set_xlabel(f'{param_name} Value')
+        #ax.set_title(f'Adjustment Set Size by {param_name} Value')
     else:
         # Calculate mean adjustment set size for each method
         means = {col.replace('_adj_size', ''): analysis_df[col].mean() for col in adj_cols}
@@ -3687,9 +3720,9 @@ def plot_graph_diversity_by_parameter(results_df, param_name, save_path=None):
         sns.lineplot(data=param_df, x='param_value', y='unique_graphs', 
                    marker='o', ax=ax1, color='blue')
         
-        ax1.set_xlabel(f'{param_name.capitalize()} Value')
+        ax1.set_xlabel(f'{param_name} Value')
         ax1.set_ylabel('Number of Unique Graphs')
-        #ax1.set_title(f'Graph Diversity vs {param_name.capitalize()}')
+        #ax1.set_title(f'Graph Diversity vs {param_name}')
         ax1.grid(True, linestyle='--', alpha=0.7)
     else:
         ax1.text(0.5, 0.5, "No graph diversity data", 
@@ -3702,9 +3735,9 @@ def plot_graph_diversity_by_parameter(results_df, param_name, save_path=None):
         sns.lineplot(data=param_df, x='param_value', y='ci_width', 
                    marker='o', ax=ax2, color='green')
         
-        ax2.set_xlabel(f'{param_name.capitalize()} Value')
+        ax2.set_xlabel(f'{param_name} Value')
         ax2.set_ylabel('Bootstrap CI Width')
-        ax2.set_title(f'Uncertainty vs {param_name.capitalize()}')
+        ax2.set_title(f'Uncertainty vs {param_name}')
         ax2.grid(True, linestyle='--', alpha=0.7)
     else:
         ax2.text(0.5, 0.5, "No bootstrap CI data", 
@@ -3765,9 +3798,9 @@ def plot_timing_comparison(df, param_name, save_path=None):
         ax.plot(param_values, times, marker=markers[i % len(markers)], 
                 label=method.capitalize(), linewidth=2)
     
-    ax.set_xlabel(f'{param_name.capitalize()} Value')
+    ax.set_xlabel(f'{param_name} Value')
     ax.set_ylabel('Computation Time (seconds)')
-    #ax.set_title(f'Computation Time Comparison - {param_name.capitalize()}')
+    #ax.set_title(f'Computation Time Comparison - {param_name}')
     ax.legend( bbox_to_anchor=(0.5, 1.15), loc='upper center', ncol=len(methods))
     ax.grid(True)
     
@@ -4005,7 +4038,7 @@ def plot_discovery_estimation_ratio_by_T(df, save_path=None):
 
 
 
-def generate_all_plots(study_folder, results_folder, studies=None):
+def generate_all_plots(study_folder, results_folder, studies=None, errorCI = None):
     """
     Generate all plots for the studies in the main folder.
     
@@ -4076,32 +4109,22 @@ def generate_all_plots(study_folder, results_folder, studies=None):
     plot_improved_timing_analysis(study_data['T'], save_path=timingRatio_path)
     plot_info['Ratio']['T'] = timingRatio_path
 
-    # Alternative: use compact version if preferred
-    # timingRatio_path = os.path.join(results_folder, f"Ratio_timing.pdf")
-    # plot_compact_timing_analysis(all_results, save_path=timingRatio_path)
-    # plot_info['Ratio']['T'] = timingRatio_path
-
     # Plot bootstrap timing by number of replicas
     timingBoot_path = os.path.join(results_folder, f"Replica_timing.pdf")
-    plot_bootstrap_timing_by_n_boot(study_data['B'], save_path=timingBoot_path)
+    plot_pipeline_timing_by_B(study_data['B'], save_path=timingBoot_path)
     plot_info['Replica']['n_boot'] = timingBoot_path
 
 
    
 
-    """
+    
     # 2. Overall CI Coverage Analysis
     print(f"  Generating overall CI coverage analysis...")
     overall_coverage_path = os.path.join(results_folder, f"overall_linreg_ci_coverage.pdf")
     plot_linreg_ci_coverage(all_results, save_path=overall_coverage_path)
     plot_info['linreg_ci_coverage']['overall'] = overall_coverage_path
-    
-    overall_ci_analysis_path = os.path.join(results_folder, f"overall_linreg_ci_analysis.pdf")
-    analyze_linreg_ci_properties(all_results, save_path=overall_ci_analysis_path)
-    plot_info['linreg_ci_analysis']['overall'] = overall_ci_analysis_path
-    """
 
-    print(f"  Generating overall estimation success rate plot...")
+    print(f"  Generating overall estimation success rate plot...")    
     overall_success_path = os.path.join(results_folder, f"overall_estimation_success.pdf")
     plot_estimation_success_rate(all_results, save_path=overall_success_path)
     plot_info['estimation_success']['overall'] = overall_success_path
@@ -4124,13 +4147,20 @@ def generate_all_plots(study_folder, results_folder, studies=None):
         print(f"  Generating error plots without CI...")
         # Absolute error
         abs_error_path = os.path.join(results_folder, f"{param_name}_abs_error.pdf")
-        plot_error_comparison(df, param_name, error_type='abs', save_path=abs_error_path)
+        plot_error_comparison(df, param_name, error_type='abs', save_path=abs_error_path, errorCI = errorCI)
         # Bias (signed error)
         bias_path = os.path.join(results_folder, f"{param_name}_bias.pdf")
-        plot_error_comparison(df, param_name, error_type='raw', save_path=bias_path)
+        plot_error_comparison(df, param_name, error_type='raw', save_path=bias_path,errorCI = errorCI)
         #Relative error
         rel_path = os.path.join(results_folder, f"{param_name}_rel_error.pdf")
-        plot_error_comparison(df, param_name, error_type='rel', save_path=rel_path)
+        plot_error_comparison(df, param_name, error_type='rel', save_path=rel_path,errorCI = errorCI)
+        #RMSE
+        rmse_path = os.path.join(results_folder, f"{param_name}_rmse.pdf")
+        plot_error_comparison(df, param_name, error_type='raw', save_path=rmse_path, rms=True,errorCI = None)
+        #RMSE_rel
+        rmsrel_path = os.path.join(results_folder, f"{param_name}_rmsrel.pdf")
+        plot_error_comparison(df, param_name, error_type='rel', save_path=rmsrel_path, rms=True,errorCI = None)
+
 
         plot_info['error'][param_name] = {'abs': abs_error_path, 'bias': bias_path, 'rel':rel_path}
         
@@ -4170,7 +4200,7 @@ def generate_all_plots(study_folder, results_folder, studies=None):
                     true_graph_effect=row.get('true_graph_effect'),
                     pcmci_effect=row.get('pcmci_effect'),
                     bagged_effect=row.get('bagged_effect'),
-                    title=f"{param_name.capitalize()} = {param_val}",
+                    title=f"{param_name} = {param_val}",
                     save_path=bs_path
                 )
                 bootstrap_paths[param_val] = bs_path
@@ -4184,13 +4214,14 @@ def generate_all_plots(study_folder, results_folder, studies=None):
             plot_adjustment_sets(df, param_name, save_path=adj_path)
             plot_info['adjustment'][param_name] = adj_path
         
-        """
+        
         # 8. New: CI coverage by parameter
         print(f"  Generating CI coverage plots...")
         coverage_path = os.path.join(results_folder, f"{param_name}_linreg_ci_coverage.pdf")
         plot_linreg_ci_coverage(df, param_name, save_path=coverage_path)
         plot_info['linreg_ci_coverage'][param_name] = coverage_path
         
+        """
         # 9. New: CI properties analysis
         print(f"  Generating CI properties analysis...")
         ci_analysis_path = os.path.join(results_folder, f"{param_name}_linreg_ci_analysis.pdf")
@@ -4238,7 +4269,7 @@ def generate_all_plots(study_folder, results_folder, studies=None):
                 for param_name in study_data.keys():
                     subset = combined_errors[combined_errors['param_name'] == param_name]
                     plt.plot(subset['param_value'], subset[f'{method}_abs_error'], 
-                            marker='o', label=param_name.capitalize())
+                            marker='o', label=param_name)
                 
                 plt.xlabel('Parameter Value')
                 plt.ylabel('Mean Absolute Error')
@@ -4274,7 +4305,7 @@ def generate_all_plots(study_folder, results_folder, studies=None):
                         subset = method_coverage[method_coverage['param_name'] == param_name]
                         if len(subset) > 0:
                             plt.plot(subset['param_value'], subset[f'{method}_ci_covers'] * 100, 
-                                    marker='o', label=param_name.capitalize())
+                                    marker='o', label=param_name)
                     
                     plt.axhline(y=95, color='gray', linestyle='--', alpha=0.7, label='95% Target')
                     plt.xlabel('Parameter Value')
@@ -4292,6 +4323,9 @@ def generate_all_plots(study_folder, results_folder, studies=None):
     return plot_info
 
 if __name__ == "__main__":
+    #Loads all results from a study folder and creates all plots.
+
+
     from causal_evaluation import load_study_results
 
     from datetime import datetime
@@ -4304,7 +4338,7 @@ if __name__ == "__main__":
     
 
     # Set the main study folder path
-    main_study_folder = "full_study_results_2025-04-05_14-00-23"
+    main_study_folder = "full_study_results_2025-04-09_19-29-03"
     studies = None
 
     # Create a results folder for the analysis
@@ -4312,4 +4346,4 @@ if __name__ == "__main__":
     os.makedirs(results_folder, exist_ok=True)
 
     print("Loading study results and generating all plots...")
-    plot_info = generate_all_plots(main_study_folder, results_folder, studies)
+    plot_info = generate_all_plots(main_study_folder, results_folder, studies, errorCI=lambda x: (x.min(), x.max()))
